@@ -1,21 +1,20 @@
 <p align="center">
-  <img src="web/public/icons/logo.svg" alt="KV Files Logo" width="110" height="110" style="border-radius: 24px; box-shadow: 0 12px 32px rgba(37,99,235,0.25);">
+  <img src="web/public/icons/logo.svg" alt="KV Files PRO Logo" width="120" height="120" style="border-radius: 26px; box-shadow: 0 14px 36px rgba(37,99,235,0.3);">
 </p>
 
-<h1 align="center">KV Files (kv-file)</h1>
+<h1 align="center">⚡ KV Files PRO (kv-file-pro)</h1>
 
 <p align="center">
-  <strong>The ultra-fast, modern self-hosted web file manager.</strong><br>
+  <strong>Military-grade, ultra-fast commercial web file manager & studio workspace.</strong><br>
   Fusing the cascading elegance of <b>macOS Miller Columns</b> with <b>Windows Explorer precision</b>.<br>
-  <i>Built with a pure Rust (Axum + Tokio) backend, embedded SQLite WAL, and a mobile-first React PWA.</i>
+  <i>Built with a pure Rust (Axum + Tokio) backend, embedded SQLite WAL, offline Ed25519 asymmetric licensing, and 3D CAD / Adobe Creative Suite studios.</i>
 </p>
 
 <p align="center">
-  <a href="https://github.com/vndangkhoa/kv-file/stargazers"><img src="https://img.shields.io/github/stars/vndangkhoa/kv-file?style=for-the-badge&logo=apachespark&color=f59e0b" alt="GitHub Stars"></a>
-  <a href="https://hub.docker.com/r/vndangkhoa/kv-file"><img src="https://img.shields.io/docker/pulls/vndangkhoa/kv-file?style=for-the-badge&logo=docker&logoColor=white&label=Pulls&color=2563eb" alt="Docker Hub Pulls"></a>
-  <a href="https://github.com/vndangkhoa/kv-file/releases"><img src="https://img.shields.io/github/v/release/vndangkhoa/kv-file?style=for-the-badge&logo=github&color=059669" alt="Latest Release"></a>
-  <a href="https://vndangkhoa.github.io/kv-file/?ref=readme"><img src="https://img.shields.io/badge/Website_&_Docs-Visit-6366f1?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Docs"></a>
-  <a href="#license"><img src="https://img.shields.io/badge/License-MIT-gray?style=for-the-badge" alt="License MIT"></a>
+  <a href="https://github.com/vndangkhoa/kv-file-pro"><img src="https://img.shields.io/badge/Repository-Private-blueviolet?style=for-the-badge&logo=github&color=7c3aed" alt="Private Repo"></a>
+  <a href="https://hub.docker.com/r/vndangkhoa/kv-file-pro"><img src="https://img.shields.io/docker/pulls/vndangkhoa/kv-file-pro?style=for-the-badge&logo=docker&logoColor=white&label=Docker%20Hub&color=2563eb" alt="Docker Hub"></a>
+  <a href="https://github.com/vndangkhoa/kv-file-pro/releases"><img src="https://img.shields.io/badge/Release-v2.1.0-emerald?style=for-the-badge&logo=github&color=059669" alt="Latest Release"></a>
+  <a href="#-kv-files-pro--enterprise--commercial-edition"><img src="https://img.shields.io/badge/Edition-PRO_Commercial-amber?style=for-the-badge&logo=auth0&logoColor=white&color=d97706" alt="PRO Edition"></a>
 </p>
 
 <p align="center">
@@ -132,16 +131,16 @@ Open **`http://localhost:8866`** in your browser to complete initial administrat
 
 ### Option B: One-Command Docker Run
 
-Launch KV Files via Docker container:
+Launch KV Files PRO via Docker container:
 
 ```bash
 docker run -d \
-  --name kv-file \
+  --name kv-file-pro \
   -p 8866:8866 \
   -v ./data:/data \
   -v /path/to/my/storage:/storage \
   --restart unless-stopped \
-  ghcr.io/vndangkhoa/kv-file:latest
+  vndangkhoa/kv-file-pro:latest
 ```
 
 Open **`http://localhost:8866`** in your browser to complete initial administrator setup.
@@ -154,11 +153,11 @@ Save the following as `docker-compose.yml`:
 
 ```yaml
 services:
-  kv-file:
-    image: ghcr.io/vndangkhoa/kv-file:latest
-    # Or use Docker Hub:
-    # image: vndangkhoa/kv-file:latest
-    container_name: kv-file
+  kv-file-pro:
+    image: vndangkhoa/kv-file-pro:latest
+    # Or GHCR (Private):
+    # image: ghcr.io/vndangkhoa/kv-file-pro:latest
+    container_name: kv-file-pro
     restart: unless-stopped
     ports:
       - "8866:8866"
@@ -168,6 +167,8 @@ services:
       - KV_DATA_DIR=/data
       # Format: [label]:[container_path]:[label2]:[container_path2]
       - KV_STORAGE_ROOTS=photos:/storage/photos:documents:/storage/docs:backups:/storage/backups
+      # Optional: Master Offline Ed25519 Pro License Key
+      # - KV_LICENSE_KEY=KVPRO-...
       - RUST_LOG=kv_files=info,tower_http=info
     volumes:
       # Persistent database, user sessions, and trash bin
@@ -194,12 +195,12 @@ docker compose up -d
 
 Multi-architecture images (`linux/amd64`, `linux/arm64`) are published continuously:
 
-| Registry | Image Identifier |
-| :--- | :--- |
-| **GitHub Container Registry (GHCR)** | `ghcr.io/vndangkhoa/kv-file:latest` |
-| **Docker Hub** | `vndangkhoa/kv-file:latest` |
-| **Forgejo (Primary Mirror)** | `git.khoavo.vndns.net/vndangkhoa/kv-file:latest` |
-| **Forgejo (Secondary Mirror)** | `git.khoavo.myds.me/vndangkhoa/kv-file:latest` |
+| Registry | Image Identifier | Access |
+| :--- | :--- | :--- |
+| **Docker Hub** | `vndangkhoa/kv-file-pro:latest` | Standard Hub Image |
+| **GitHub Container Registry (GHCR)** | `ghcr.io/vndangkhoa/kv-file-pro:latest` | Private Registry |
+| **Forgejo (Primary Mirror)** | `git.khoavo.vndns.net/vndangkhoa/kv-file-pro:latest` | Private Mirror |
+| **Forgejo (Secondary Mirror)** | `git.khoavo.myds.me/vndangkhoa/kv-file-pro:latest` | Private Mirror |
 
 ---
 
@@ -281,13 +282,16 @@ Configure KV Files via environment variables or command-line flags:
 To compile manually without the launch script:
 
 ```bash
-# 1. Build Web Frontend & Hugo Documentation
-cd web && npm install && npm run build && cd ..
+# 1. Clone repository
+git clone https://github.com/vndangkhoa/kv-file-pro.git && cd kv-file-pro
 
-# 2. Compile optimized Rust binary
+# 2. Build Web Frontend & Hugo Documentation
+cd web && npm install && npm run build:pro && cd ..
+
+# 3. Compile optimized Rust binary
 cargo build --release
 
-# 3. Run directly
+# 4. Run directly
 ./target/release/kv-files --port 8866 --storage-roots ./storage
 ```
 
@@ -295,7 +299,7 @@ cargo build --release
 
 ## 📡 Documentation & API
 
-KV Files includes an embedded documentation portal and a comprehensive REST/WebSocket API under `/api/v1`.
+KV Files PRO includes an embedded documentation portal and a comprehensive REST/WebSocket API under `/api/v1`.
 
 - 🚀 **[Getting Started & Installation Guide](https://vndangkhoa.github.io/kv-file/docs/getting-started/)**
 - 🛡️ **[Reverse Proxy Setup (Nginx, Caddy, Traefik)](https://vndangkhoa.github.io/kv-file/docs/getting-started/reverse-proxy/)**
@@ -304,25 +308,19 @@ KV Files includes an embedded documentation portal and a comprehensive REST/WebS
 
 ---
 
-## 🌟 Support & Community
+## 🌟 Support & Commercial Inquiries
 
-If you find KV Files valuable, please consider supporting the project:
+If you find KV Files PRO valuable:
 
-- **Star this repository** on GitHub to help others discover it ⭐
+- **Star this repository** on GitHub to support active development ⭐
 - Share your setup on [Reddit r/selfhosted](https://reddit.com/r/selfhosted) or tech forums
-- File bug reports or submit feature suggestions via [GitHub Issues](https://github.com/vndangkhoa/kv-file/issues)
-- Open Pull Requests to help improve features, translations, or documentation
-
-<p align="center">
-  <a href="https://star-history.com/#vndangkhoa/kv-file&Date">
-    <img src="https://api.star-history.com/svg?repos=vndangkhoa/kv-file&type=Date" alt="KV Files Star History" width="75%">
-  </a>
-</p>
+- File bug reports or submit feature suggestions via [GitHub Issues](https://github.com/vndangkhoa/kv-file-pro/issues)
+- Inquire about Enterprise volume licensing and custom branding extensions
 
 ---
 
 ## 📄 License
 
-Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for complete details.
+Distributed under the **KV Files PRO Commercial & Enterprise License**. See [`LICENSE`](LICENSE) for complete details.
 
 Developed with ❤️ by **Khoa Vo ([@vndangkhoa](https://github.com/vndangkhoa))**.

@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  kv-file:
-    image: ghcr.io/vndangkhoa/kv-file:latest
-    container_name: kv-file
+  kv-file-pro:
+    image: vndangkhoa/kv-file-pro:latest
+    container_name: kv-file-pro
     restart: unless-stopped
     ports:
       - "8866:8866"
