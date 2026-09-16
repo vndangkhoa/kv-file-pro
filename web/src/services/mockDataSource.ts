@@ -157,6 +157,78 @@ Welcome to the KV Files demo!
 - [x] Windows Explorer left sidebar tree
 - [ ] Mobile drawer view and gestures`,
   },
+  {
+    name: 'Flange_Mount_CAD.dxf',
+    path: 'documents/Flange_Mount_CAD.dxf',
+    root_name: 'storage',
+    is_dir: false,
+    size: 284000,
+    human_size: '277.3 KB',
+    mod_time: new Date(Date.now() - 3600000 * 8).toISOString(),
+    extension: 'dxf',
+    media_type: 'other',
+    mime_type: 'application/dxf',
+  },
+  {
+    name: 'Architectural_Site_Plan.dwg',
+    path: 'documents/Architectural_Site_Plan.dwg',
+    root_name: 'storage',
+    is_dir: false,
+    size: 1450000,
+    human_size: '1.38 MB',
+    mod_time: new Date(Date.now() - 3600000 * 6).toISOString(),
+    extension: 'dwg',
+    media_type: 'other',
+    mime_type: 'image/vnd.dwg',
+  },
+  {
+    name: 'Planetary_Gearbox_Assembly.step',
+    path: 'documents/Planetary_Gearbox_Assembly.step',
+    root_name: 'storage',
+    is_dir: false,
+    size: 6420000,
+    human_size: '6.12 MB',
+    mod_time: new Date(Date.now() - 3600000 * 10).toISOString(),
+    extension: 'step',
+    media_type: 'other',
+    mime_type: 'application/step',
+  },
+  {
+    name: 'Commercial_Office_BIM.ifc',
+    path: 'documents/Commercial_Office_BIM.ifc',
+    root_name: 'storage',
+    is_dir: false,
+    size: 18900000,
+    human_size: '18.02 MB',
+    mod_time: new Date(Date.now() - 3600000 * 16).toISOString(),
+    extension: 'ifc',
+    media_type: 'other',
+    mime_type: 'application/x-step',
+  },
+  {
+    name: 'Turbine_Bracket_3D.stl',
+    path: 'documents/Turbine_Bracket_3D.stl',
+    root_name: 'storage',
+    is_dir: false,
+    size: 1840000,
+    human_size: '1.75 MB',
+    mod_time: new Date(Date.now() - 3600000 * 14).toISOString(),
+    extension: 'stl',
+    media_type: 'other',
+    mime_type: 'model/stl',
+  },
+  {
+    name: 'Brand_Identity_Artboard.psd',
+    path: 'documents/Brand_Identity_Artboard.psd',
+    root_name: 'storage',
+    is_dir: false,
+    size: 42500000,
+    human_size: '40.5 MB',
+    mod_time: new Date(Date.now() - 3600000 * 4).toISOString(),
+    extension: 'psd',
+    media_type: 'image',
+    mime_type: 'image/vnd.adobe.photoshop',
+  },
 
   // Media folder
   {
@@ -396,6 +468,563 @@ edition = "2021"`,
     extension: 'zip',
     media_type: 'archive',
     mime_type: 'application/zip',
+  },
+
+  // Mock Extensions Suite
+  {
+    name: 'mock_extensions',
+    path: 'mock_extensions',
+    root_name: 'storage',
+    is_dir: true,
+    size: 0,
+    human_size: '0 B',
+    mod_time: new Date().toISOString(),
+    extension: '',
+    media_type: 'other',
+    mime_type: 'directory',
+  },
+  {
+    name: '01_cad_and_3d',
+    path: 'mock_extensions/01_cad_and_3d',
+    root_name: 'storage',
+    is_dir: true,
+    size: 0,
+    human_size: '0 B',
+    mod_time: new Date().toISOString(),
+    extension: '',
+    media_type: 'other',
+    mime_type: 'directory',
+  },
+  {
+    name: 'flange_bracket_2d.dxf',
+    path: 'mock_extensions/01_cad_and_3d/flange_bracket_2d.dxf',
+    root_name: 'storage',
+    is_dir: false,
+    size: 4200,
+    human_size: '4.1 KB',
+    mod_time: new Date().toISOString(),
+    extension: 'dxf',
+    media_type: 'other',
+    mime_type: 'application/dxf',
+  },
+  {
+    name: 'architectural_floorplan.dwg',
+    path: 'mock_extensions/01_cad_and_3d/architectural_floorplan.dwg',
+    root_name: 'storage',
+    is_dir: false,
+    size: 236512,
+    human_size: '230.9 KB',
+    mod_time: new Date().toISOString(),
+    extension: 'dwg',
+    media_type: 'other',
+    mime_type: 'image/vnd.dwg',
+  },
+  {
+    name: 'planetary_gearbox.step',
+    path: 'mock_extensions/01_cad_and_3d/planetary_gearbox.step',
+    root_name: 'storage',
+    is_dir: false,
+    size: 14500,
+    human_size: '14.2 KB',
+    mod_time: new Date().toISOString(),
+    extension: 'step',
+    media_type: 'other',
+    mime_type: 'application/step',
+  },
+  {
+    name: 'commercial_office_building.ifc',
+    path: 'mock_extensions/01_cad_and_3d/commercial_office_building.ifc',
+    root_name: 'storage',
+    is_dir: false,
+    size: 22800,
+    human_size: '22.3 KB',
+    mod_time: new Date().toISOString(),
+    extension: 'ifc',
+    media_type: 'other',
+    mime_type: 'application/x-step',
+  },
+  {
+    name: 'turbine_mounting_bracket.stl',
+    path: 'mock_extensions/01_cad_and_3d/turbine_mounting_bracket.stl',
+    root_name: 'storage',
+    is_dir: false,
+    size: 1240,
+    human_size: '1.2 KB',
+    mod_time: new Date().toISOString(),
+    extension: 'stl',
+    media_type: 'other',
+    mime_type: 'model/stl',
+  },
+  {
+    name: 'lowpoly_shuttle.obj',
+    path: 'mock_extensions/01_cad_and_3d/lowpoly_shuttle.obj',
+    root_name: 'storage',
+    is_dir: false,
+    size: 850,
+    human_size: '850 B',
+    mod_time: new Date().toISOString(),
+    extension: 'obj',
+    media_type: 'other',
+    mime_type: 'text/plain',
+  },
+
+  // 02_adobe_suite
+  {
+    name: '02_adobe_suite',
+    path: 'mock_extensions/02_adobe_suite',
+    root_name: 'storage',
+    is_dir: true,
+    size: 0,
+    human_size: '0 B',
+    mod_time: new Date().toISOString(),
+    extension: '',
+    media_type: 'other',
+    mime_type: 'directory',
+  },
+  {
+    name: 'brand_identity_artboard.psd',
+    path: 'mock_extensions/02_adobe_suite/brand_identity_artboard.psd',
+    root_name: 'storage',
+    is_dir: false,
+    size: 12582938,
+    human_size: '12.0 MB',
+    mod_time: new Date().toISOString(),
+    extension: 'psd',
+    media_type: 'image',
+    mime_type: 'image/vnd.adobe.photoshop',
+  },
+  {
+    name: 'vector_graphics_showcase.ai',
+    path: 'mock_extensions/02_adobe_suite/vector_graphics_showcase.ai',
+    root_name: 'storage',
+    is_dir: false,
+    size: 1675966,
+    human_size: '1.6 MB',
+    mod_time: new Date().toISOString(),
+    extension: 'ai',
+    media_type: 'image',
+    mime_type: 'application/illustrator',
+  },
+  {
+    name: 'magazine_editorial.idml',
+    path: 'mock_extensions/02_adobe_suite/magazine_editorial.idml',
+    root_name: 'storage',
+    is_dir: false,
+    size: 45000,
+    human_size: '43.9 KB',
+    mod_time: new Date().toISOString(),
+    extension: 'idml',
+    media_type: 'other',
+    mime_type: 'application/vnd.adobe.indesign-idml-package',
+  },
+  {
+    name: 'mobile_app_ux.xd',
+    path: 'mock_extensions/02_adobe_suite/mobile_app_ux.xd',
+    root_name: 'storage',
+    is_dir: false,
+    size: 28500,
+    human_size: '27.8 KB',
+    mod_time: new Date().toISOString(),
+    extension: 'xd',
+    media_type: 'other',
+    mime_type: 'application/vnd.adobe.xd',
+  },
+  {
+    name: 'commercial_cut_v4.prproj',
+    path: 'mock_extensions/02_adobe_suite/commercial_cut_v4.prproj',
+    root_name: 'storage',
+    is_dir: false,
+    size: 18400,
+    human_size: '18.0 KB',
+    mod_time: new Date().toISOString(),
+    extension: 'prproj',
+    media_type: 'other',
+    mime_type: 'application/x-premiere',
+  },
+  {
+    name: 'motion_graphics_intro.aepx',
+    path: 'mock_extensions/02_adobe_suite/motion_graphics_intro.aepx',
+    root_name: 'storage',
+    is_dir: false,
+    size: 8900,
+    human_size: '8.7 KB',
+    mod_time: new Date().toISOString(),
+    extension: 'aepx',
+    media_type: 'other',
+    mime_type: 'application/x-aftereffects',
+  },
+  {
+    name: 'studio_portrait_raw.dng',
+    path: 'mock_extensions/02_adobe_suite/studio_portrait_raw.dng',
+    root_name: 'storage',
+    is_dir: false,
+    size: 24500000,
+    human_size: '23.36 MB',
+    mod_time: new Date().toISOString(),
+    extension: 'dng',
+    media_type: 'image',
+    mime_type: 'image/x-adobe-dng',
+  },
+
+  // 03_typography_fonts
+  {
+    name: '03_typography_fonts',
+    path: 'mock_extensions/03_typography_fonts',
+    root_name: 'storage',
+    is_dir: true,
+    size: 0,
+    human_size: '0 B',
+    mod_time: new Date().toISOString(),
+    extension: '',
+    media_type: 'other',
+    mime_type: 'directory',
+  },
+  {
+    name: 'LiberationSans-Regular.ttf',
+    path: 'mock_extensions/03_typography_fonts/LiberationSans-Regular.ttf',
+    root_name: 'storage',
+    is_dir: false,
+    size: 410820,
+    human_size: '401.2 KB',
+    mod_time: new Date().toISOString(),
+    extension: 'ttf',
+    media_type: 'other',
+    mime_type: 'font/ttf',
+    previewUrl: '/media/LiberationSans-Regular.ttf',
+  },
+  {
+    name: 'URWBookman-Light.otf',
+    path: 'mock_extensions/03_typography_fonts/URWBookman-Light.otf',
+    root_name: 'storage',
+    is_dir: false,
+    size: 145000,
+    human_size: '141.6 KB',
+    mod_time: new Date().toISOString(),
+    extension: 'otf',
+    media_type: 'other',
+    mime_type: 'font/otf',
+  },
+  {
+    name: 'MaterialSymbols.woff2',
+    path: 'mock_extensions/03_typography_fonts/MaterialSymbols.woff2',
+    root_name: 'storage',
+    is_dir: false,
+    size: 265212,
+    human_size: '259.0 KB',
+    mod_time: new Date().toISOString(),
+    extension: 'woff2',
+    media_type: 'other',
+    mime_type: 'font/woff2',
+  },
+  {
+    name: 'KaTeX_Main.woff',
+    path: 'mock_extensions/03_typography_fonts/KaTeX_Main.woff',
+    root_name: 'storage',
+    is_dir: false,
+    size: 19412,
+    human_size: '18.9 KB',
+    mod_time: new Date().toISOString(),
+    extension: 'woff',
+    media_type: 'other',
+    mime_type: 'font/woff',
+  },
+
+  // 04_sysvis_diagrams
+  {
+    name: '04_sysvis_diagrams',
+    path: 'mock_extensions/04_sysvis_diagrams',
+    root_name: 'storage',
+    is_dir: true,
+    size: 0,
+    human_size: '0 B',
+    mod_time: new Date().toISOString(),
+    extension: '',
+    media_type: 'other',
+    mime_type: 'directory',
+  },
+  {
+    name: 'cloud_microservices_architecture.mmd',
+    path: 'mock_extensions/04_sysvis_diagrams/cloud_microservices_architecture.mmd',
+    root_name: 'storage',
+    is_dir: false,
+    size: 1100,
+    human_size: '1.1 KB',
+    mod_time: new Date().toISOString(),
+    extension: 'mmd',
+    media_type: 'other',
+    mime_type: 'text/vnd.mermaid',
+    content: `flowchart TD
+    subgraph Clients["Clients & Edge Gateway"]
+        Browser["🌐 Web Browser (React PWA)"]
+        Mobile["📱 Mobile PWA / Safari iOS"]
+        WAF["🛡️ Cloudflare Zero Trust / WAF"]
+    end
+
+    subgraph HostSystem["KV Files Host System (Port 8866)"]
+        AxumServer["⚡ Rust Axum Web Server"]
+        Router["🔀 Tokio API / VFS Router"]
+        Watcher["👁️ Linux Kernel inotify Watcher"]
+        VFS["📁 Virtual Filesystem Engine"]
+        SQLite["💾 Embedded SQLite WAL Database"]
+    end
+
+    subgraph StoragePools["Mounted Storage Roots"]
+        Photos["📷 /mnt/storage/photos"]
+        Docs["📄 /mnt/storage/documents"]
+        Backups["🗄️ /mnt/storage/backups"]
+    end
+
+    Browser --> WAF
+    Mobile --> WAF
+    WAF --> AxumServer
+    AxumServer --> Router
+    Router --> VFS
+    Router --> SQLite
+    VFS --> Photos
+    VFS --> Docs
+    VFS --> Backups
+    Watcher -.->|"Real-Time Events"| VFS
+    VFS -.->|"WebSocket Broadcast"| Browser`,
+  },
+  {
+    name: 'kubernetes_gitops_pipeline.flow',
+    path: 'mock_extensions/04_sysvis_diagrams/kubernetes_gitops_pipeline.flow',
+    root_name: 'storage',
+    is_dir: false,
+    size: 890,
+    human_size: '890 B',
+    mod_time: new Date().toISOString(),
+    extension: 'flow',
+    media_type: 'other',
+    mime_type: 'text/vnd.mermaid',
+    content: `flowchart LR
+    Dev(["🧑‍💻 Developer Commit"]) --> GitRepo["🐙 GitHub Repository"]
+    GitRepo --> CI["⚡ GitHub Actions CI"]
+    
+    subgraph Build["Container & Binary Build"]
+        CI --> WebBuild["📦 React Vite PWA Build"]
+        CI --> RustBuild["🦀 Cargo Release Binary"]
+        WebBuild --> Embed["🗜️ rust-embed Assets"]
+        RustBuild --> Embed
+    end
+
+    Embed --> Docker["🐳 Multi-Arch Docker Image"]
+    Docker --> Registry["📦 GHCR Registry"]
+    Registry --> ArgoCD["🚀 Auto-Deploy Agent"]
+    ArgoCD --> Production["🌐 Kubernetes Production"]`,
+  },
+  {
+    name: 'distributed_event_stream.arch',
+    path: 'mock_extensions/04_sysvis_diagrams/distributed_event_stream.arch',
+    root_name: 'storage',
+    is_dir: false,
+    size: 750,
+    human_size: '750 B',
+    mod_time: new Date().toISOString(),
+    extension: 'arch',
+    media_type: 'other',
+    mime_type: 'text/vnd.mermaid',
+    content: `flowchart TD
+    Ingest["📡 Event Ingestion Broker"]
+    Kafka{{"⚡ Apache Kafka Event Stream"}}
+    
+    subgraph Processing["Distributed Stream Processors"]
+        Worker1["⚙️ Telemetry Aggregator"]
+        Worker2["⚙️ AI Vector Embedding Service"]
+        Worker3["⚙️ Notification Worker"]
+    end
+
+    subgraph Caching["Cache & Persistence Tier"]
+        Redis[("⚡ Redis Cluster")]
+        Postgres[("🐘 TimescaleDB Primary")]
+    end
+
+    Ingest --> Kafka
+    Kafka --> Worker1
+    Kafka --> Worker2
+    Kafka --> Worker3
+    Worker1 --> Redis
+    Worker2 --> Postgres
+    Worker3 --> Redis`,
+  },
+
+  // 05_markdown_studio
+  {
+    name: '05_markdown_studio',
+    path: 'mock_extensions/05_markdown_studio',
+    root_name: 'storage',
+    is_dir: true,
+    size: 0,
+    human_size: '0 B',
+    mod_time: new Date().toISOString(),
+    extension: '',
+    media_type: 'other',
+    mime_type: 'directory',
+  },
+  {
+    name: 'interactive_developer_spec.md',
+    path: 'mock_extensions/05_markdown_studio/interactive_developer_spec.md',
+    root_name: 'storage',
+    is_dir: false,
+    size: 4200,
+    human_size: '4.1 KB',
+    mod_time: new Date().toISOString(),
+    extension: 'md',
+    media_type: 'text',
+    mime_type: 'text/markdown',
+    content: `# KV Files Technical Architecture Spec
+
+Welcome to the **KV Files** extension test document.
+
+## 1. Fast Miller Columns & Kernel Sync
+- Pure Rust Axum backend with Tokio runtime
+- SQLite embedded WAL mode
+- Linux inotify kernel notifications broadcast via WebSockets
+
+## 2. Mathematical Equations
+$$\\oint_{\\partial \\Sigma} \\mathbf{E} \\cdot d\\boldsymbol{\\ell} = -\\frac{d}{dt} \\iint_{\\Sigma} \\mathbf{B} \\cdot d\\mathbf{S}$$
+
+$$f(x) = \\frac{1}{\\sigma \\sqrt{2\\pi}} \\exp\\left( -\\frac{(x - \\mu)^2}{2\\sigma^2} \\right)$$
+
+## 3. Architecture Flowchart
+\`\`\`mermaid
+flowchart LR
+    User([Browser]) --> Axum[Axum Backend]
+    Axum --> Storage[(VFS Storage)]
+    Storage -.-> Kernel[Linux inotify]
+    Kernel -.-> Axum
+\`\`\`
+`,
+  },
+
+  // 06_archives
+  {
+    name: '06_archives',
+    path: 'mock_extensions/06_archives',
+    root_name: 'storage',
+    is_dir: true,
+    size: 0,
+    human_size: '0 B',
+    mod_time: new Date().toISOString(),
+    extension: '',
+    media_type: 'other',
+    mime_type: 'directory',
+  },
+  {
+    name: 'release_v2.0_bundle.zip',
+    path: 'mock_extensions/06_archives/release_v2.0_bundle.zip',
+    root_name: 'storage',
+    is_dir: false,
+    size: 42000,
+    human_size: '41.0 KB',
+    mod_time: new Date().toISOString(),
+    extension: 'zip',
+    media_type: 'archive',
+    mime_type: 'application/zip',
+  },
+  {
+    name: 'server_telemetry_logs.tar.gz',
+    path: 'mock_extensions/06_archives/server_telemetry_logs.tar.gz',
+    root_name: 'storage',
+    is_dir: false,
+    size: 28000,
+    human_size: '27.3 KB',
+    mod_time: new Date().toISOString(),
+    extension: 'gz',
+    media_type: 'archive',
+    mime_type: 'application/gzip',
+  },
+
+  // 07_code_and_configs
+  {
+    name: '07_code_and_configs',
+    path: 'mock_extensions/07_code_and_configs',
+    root_name: 'storage',
+    is_dir: true,
+    size: 0,
+    human_size: '0 B',
+    mod_time: new Date().toISOString(),
+    extension: '',
+    media_type: 'other',
+    mime_type: 'directory',
+  },
+  {
+    name: 'lru_cache.rs',
+    path: 'mock_extensions/07_code_and_configs/lru_cache.rs',
+    root_name: 'storage',
+    is_dir: false,
+    size: 1200,
+    human_size: '1.2 KB',
+    mod_time: new Date().toISOString(),
+    extension: 'rs',
+    media_type: 'code',
+    mime_type: 'text/x-rust',
+    content: `// KV Files — Fast In-Memory LRU Cache\nuse std::collections::HashMap;\n\npub struct LruCache<K, V> {\n    capacity: usize,\n    items: HashMap<K, V>,\n}\n`,
+  },
+  {
+    name: 'file_tree_service.ts',
+    path: 'mock_extensions/07_code_and_configs/file_tree_service.ts',
+    root_name: 'storage',
+    is_dir: false,
+    size: 800,
+    human_size: '800 B',
+    mod_time: new Date().toISOString(),
+    extension: 'ts',
+    media_type: 'code',
+    mime_type: 'text/typescript',
+    content: `export interface TreeNode {\n  name: string;\n  path: string;\n  is_dir: boolean;\n  size: number;\n}\n`,
+  },
+  {
+    name: 'telemetry_collector.py',
+    path: 'mock_extensions/07_code_and_configs/telemetry_collector.py',
+    root_name: 'storage',
+    is_dir: false,
+    size: 950,
+    human_size: '950 B',
+    mod_time: new Date().toISOString(),
+    extension: 'py',
+    media_type: 'code',
+    mime_type: 'text/x-python',
+    content: `#!/usr/bin/env python3\nfrom dataclasses import dataclass\n\n@dataclass\nclass StorageMetric:\n    mount: str\n    free_gb: float\n`,
+  },
+  {
+    name: 'schema_migrations.sql',
+    path: 'mock_extensions/07_code_and_configs/schema_migrations.sql',
+    root_name: 'storage',
+    is_dir: false,
+    size: 1500,
+    human_size: '1.5 KB',
+    mod_time: new Date().toISOString(),
+    extension: 'sql',
+    media_type: 'code',
+    mime_type: 'application/sql',
+    content: `-- KV Files Schema Migrations\nCREATE TABLE IF NOT EXISTS shares (\n    id TEXT PRIMARY KEY,\n    token TEXT NOT NULL\n);\n`,
+  },
+  {
+    name: 'kubernetes_manifest.yaml',
+    path: 'mock_extensions/07_code_and_configs/kubernetes_manifest.yaml',
+    root_name: 'storage',
+    is_dir: false,
+    size: 1100,
+    human_size: '1.1 KB',
+    mod_time: new Date().toISOString(),
+    extension: 'yaml',
+    media_type: 'code',
+    mime_type: 'text/yaml',
+    content: `apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: kv-file\n`,
+  },
+  {
+    name: 'infrastructure_iac.tf',
+    path: 'mock_extensions/07_code_and_configs/infrastructure_iac.tf',
+    root_name: 'storage',
+    is_dir: false,
+    size: 650,
+    human_size: '650 B',
+    mod_time: new Date().toISOString(),
+    extension: 'tf',
+    media_type: 'code',
+    mime_type: 'text/plain',
+    content: `resource "aws_s3_bucket" "kv_files_backups" {\n  bucket = "kv-files-nas-offsite-backups"\n}\n`,
   },
 ];
 
@@ -919,6 +1548,7 @@ class MockFileSystem implements FileSystemDataSource {
   getRawFileUrl(root: string, path: string): string {
     const item = this.items.find((i) => i.root_name === root && i.path === path);
     if (item?.previewUrl) return item.previewUrl;
+    if (item?.content) return `data:${item.mime_type || 'text/plain'};charset=utf-8,${encodeURIComponent(item.content)}`;
     return `/api/v1/fs/raw?root=${encodeURIComponent(root)}&path=${encodeURIComponent(path)}`;
   }
 

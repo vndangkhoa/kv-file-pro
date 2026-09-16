@@ -21,6 +21,12 @@ import {
   Video,
   Trash2,
   Settings,
+  Box,
+  Palette,
+  Type,
+  BookOpen,
+  Workflow,
+  PenTool,
 } from 'lucide-react';
 import { MediaType } from '../../types';
 
@@ -135,6 +141,46 @@ export const FileIcon: React.FC<FileIconProps> = ({ item, className = '', size =
     }
   }
 
+  const ext = (item.name || '').split('.').pop()?.toLowerCase() || '';
+
+  // Specialized formats supported by Extension Center (CAD, BIM, 3D Meshes & G-Code)
+  if (['dxf', 'dwg', 'ifc', 'step', 'stp', 'iges', 'igs', 'brep', 'stl', 'obj', 'gltf', 'glb', '3mf', 'ply', 'fbx', 'gcode'].includes(ext)) {
+    return <Box size={size} className={`text-sky-500 ${className}`} />;
+  }
+  if (['psd', 'psb'].includes(ext)) {
+    return <Palette size={size} className={`text-blue-500 ${className}`} />;
+  }
+  if (['ai', 'eps'].includes(ext)) {
+    return <Palette size={size} className={`text-amber-500 ${className}`} />;
+  }
+  if (['indd', 'indt', 'idml'].includes(ext)) {
+    return <Layers size={size} className={`text-pink-500 ${className}`} />;
+  }
+  if (['xd'].includes(ext)) {
+    return <Palette size={size} className={`text-fuchsia-500 ${className}`} />;
+  }
+  if (['cdr', 'cdt', 'cdx', 'cmx'].includes(ext)) {
+    return <Palette size={size} className={`text-emerald-500 ${className}`} />;
+  }
+  if (['prproj'].includes(ext)) {
+    return <FileVideo size={size} className={`text-indigo-400 ${className}`} />;
+  }
+  if (['aep', 'aepx'].includes(ext)) {
+    return <Layers size={size} className={`text-purple-400 ${className}`} />;
+  }
+  if (['ttf', 'otf', 'woff', 'woff2', 'eot'].includes(ext) || item.media_type === 'font') {
+    return <Type size={size} className={`text-amber-500 ${className}`} />;
+  }
+  if (['mmd', 'mermaid', 'flow', 'arch', 'diag'].includes(ext)) {
+    return <Workflow size={size} className={`text-indigo-500 ${className}`} />;
+  }
+  if (['epub', 'mobi', 'azw', 'azw3', 'cbz', 'cbr', 'djvu'].includes(ext)) {
+    return <BookOpen size={size} className={`text-emerald-600 ${className}`} />;
+  }
+  if (['svg', 'svgz'].includes(ext)) {
+    return <PenTool size={size} className={`text-amber-500 ${className}`} />;
+  }
+
   switch (item.media_type) {
     case 'video':
       return <FileVideo size={size} className={`text-purple-500 ${className}`} />;
@@ -154,6 +200,8 @@ export const FileIcon: React.FC<FileIconProps> = ({ item, className = '', size =
       return <FileSpreadsheet size={size} className={`text-emerald-600 ${className}`} />;
     case 'presentation':
       return <FileText size={size} className={`text-orange-500 ${className}`} />;
+    case 'font':
+      return <Type size={size} className={`text-amber-500 ${className}`} />;
     case 'text':
       return <FileText size={size} className={`text-gray-500 ${className}`} />;
     default:

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { api } from '../services/api';
 import { User } from '../types';
+import { useExtensionStore } from './useExtensionStore';
 
 interface AuthState {
   user: User | null;
@@ -44,6 +45,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       const user = await api.getMe();
       set({ user, isLoading: false, isAuthModalOpen: false });
+      useExtensionStore.getState().fetchLicenses();
     } catch {
       // Not logged in or unauthorized: prompt login modal
       set({ user: null, isLoading: false, isAuthModalOpen: true, authMode: 'login' });
@@ -62,6 +64,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       requires2fa: false,
       preAuthToken: null,
     });
+    useExtensionStore.getState().fetchLicenses();
   },
 
   verify2fa: async (code) => {
@@ -76,6 +79,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       requires2fa: false,
       preAuthToken: null,
     });
+    useExtensionStore.getState().fetchLicenses();
   },
 
   cancel2fa: () => {
@@ -85,6 +89,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setup: async (username, password) => {
     const res = await api.initialSetup(username, password);
     set({ user: res.user, isInitialized: true, isAuthModalOpen: false });
+    useExtensionStore.getState().fetchLicenses();
   },
 
   logout: async () => {

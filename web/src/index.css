@@ -80,3 +80,78 @@
   background-size: 24px 24px;
 }
 
+/* Photoshop Transparency Checkerboard Utilities */
+.checkerboard-light {
+  background-color: #ffffff;
+  background-image: 
+    linear-gradient(45deg, #e5e7eb 25%, transparent 25%),
+    linear-gradient(-45deg, #e5e7eb 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #e5e7eb 75%),
+    linear-gradient(-45deg, transparent 75%, #e5e7eb 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+}
+
+.checkerboard-dark {
+  background-color: #18181b;
+  background-image: 
+    linear-gradient(45deg, #27272a 25%, transparent 25%),
+    linear-gradient(-45deg, #27272a 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #27272a 75%),
+    linear-gradient(-45deg, transparent 75%, #27272a 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+}
+
+/* SysVis Flowchart / React Flow Custom Node CSS Resets */
+:root, .react-flow, .dark .react-flow {
+  --xy-node-border-default: none !important;
+  --xy-node-border: none !important;
+  --xy-node-background-color-default: transparent !important;
+  --xy-node-background-color: transparent !important;
+  --xy-node-boxshadow-hover-default: none !important;
+  --xy-node-boxshadow-default: none !important;
+  --xy-node-border-radius-default: 0 !important;
+}
+
+.react-flow__node:not(.react-flow__node-group),
+.react-flow__node-default,
+.react-flow__node-input,
+.react-flow__node-output,
+.react-flow__node-server,
+.react-flow__node-tech,
+.react-flow__node-client,
+.react-flow__node-database,
+.react-flow__node-decision,
+.react-flow__node-start,
+.react-flow__node-end,
+.react-flow__node-standard {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-color: transparent !important;
+  border-width: 0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  width: auto !important;
+}
+
+.react-flow__node-group {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-color: transparent !important;
+  border-width: 0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
+.react-flow__node-default.selectable:hover,
+.react-flow__node-input.selectable:hover,
+.react-flow__node-output.selectable:hover,
+.react-flow__node-group.selectable:hover {
+  box-shadow: none !important;
+}
+
+
+

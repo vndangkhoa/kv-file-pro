@@ -481,6 +481,7 @@ impl FileOperations {
                         MediaType::Doc => "doc",
                         MediaType::Spreadsheet => "spreadsheet",
                         MediaType::Presentation => "presentation",
+                        MediaType::Font => "font",
                         MediaType::Other => if is_dir { "folder" } else { "other" },
                     };
                     if type_str != ft && !(ft == "doc" && (type_str == "pdf" || type_str == "text" || type_str == "doc" || type_str == "spreadsheet" || type_str == "presentation")) {

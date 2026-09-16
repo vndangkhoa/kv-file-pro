@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0] - 2026-09-16
+
+### 🚀 Major Feature Release: KV Files PRO Commercial Suite & Asymmetric Licensing
+Version 2.1.0 introduces **KV Files PRO**, bringing an enterprise-grade commercial extension ecosystem, offline asymmetric Ed25519 cryptographic licensing, integrated MoMo payment gateway (API v2 & personal QR code matching), universal 3D CAD/BIM studio viewport, Adobe Creative Suite studio, typography specimen studio, sysvis workflow animator, and a unified service management script (`launch.sh`).
+
+### Added
+- **Asymmetric Ed25519 Cryptographic Licensing Engine**:
+  - Offline digital signature licensing architecture built with `ed25519-dalek` ([licensing.rs](file:///mnt/data/Projects/kv-file_PRO/src/licensing.rs)).
+  - Hardcoded master public key verification ensuring 100% offline license validation without external telemetry or DRM phone-home calls.
+  - CLI key generator and license verification tool ([launch.sh keygen](file:///mnt/data/Projects/kv-file_PRO/launch.sh), [keygen.py](file:///mnt/data/Projects/kv-file_PRO/scripts/keygen.py)).
+  - Support for lifetime and timestamp-expiring license keys (`KVPRO-...`) with tamper-proof signature verification.
+- **MoMo Payment Gateway & Automated Personal QR Matching**:
+  - Direct integration with MoMo API v2 ([payments.rs](file:///mnt/data/Projects/kv-file_PRO/src/api/payments.rs), [models/payments.rs](file:///mnt/data/Projects/kv-file_PRO/src/models/payments.rs)).
+  - Automatic QR code generation for Vietnamese personal bank / MoMo transfer (`MOMO_PHONE_NUMBER=0398300340`) with unique order code tracking (`KV-...`).
+  - Interactive MoMo checkout modal ([MoMoPaymentModal.tsx](file:///mnt/data/Projects/kv-file_PRO/web/src/components/modals/settings/MoMoPaymentModal.tsx)).
+  - Comprehensive Admin Orders Management dashboard ([AdminOrdersModal.tsx](file:///mnt/data/Projects/kv-file_PRO/web/src/components/modals/settings/AdminOrdersModal.tsx)) with live status filters, manual payment approval, and license key generation.
+- **Universal CAD & BIM Studio Viewport**:
+  - WebGL 3D CAD/BIM engine supporting AutoCAD (`.dwg`, `.dxf`), IFC BIM structures, and solid 3D models (`.step`, `.stp`, `.iges`, `.stl`, `.obj`).
+  - WebAssembly-powered DWG parser integration via `@mlightcad/libredwg-web` with embedded `libredwg-web.wasm`.
+  - Professional inspection features: interactive X/Y/Z clipping section planes, exploded assembly view slider, and ViewCube 3D orientation navigation.
+- **Adobe Creative Suite Studio**:
+  - Native in-browser layer and vector parser for Adobe Photoshop (`.psd`, `.psb`) using `ag-psd`.
+  - Vector and layout preview support for Adobe Illustrator (`.ai`, `.eps`), InDesign (`.indd`, `.idml`), and Adobe XD.
+- **Typography Specimen Studio**:
+  - Dynamic waterfall font preview scales, custom sample text inputs, and Unicode glyph maps for `.ttf`, `.otf`, `.woff`, and `.woff2`.
+- **SysVis Architecture & Flow Animator**:
+  - Dynamic system workflow visualization powered by Mermaid engine and dagre layout with real-time SVG animated flow pulses.
+- **In-App Extensions Ecosystem & Catalog**:
+  - Modular extensions store and manager ([ExtensionsTab.tsx](file:///mnt/data/Projects/kv-file_PRO/web/src/components/modals/settings/ExtensionsTab.tsx), [useExtensionStore.ts](file:///mnt/data/Projects/kv-file_PRO/web/src/stores/useExtensionStore.ts)).
+  - Dynamic host previewer ([ExtensionPreviewHost.tsx](file:///mnt/data/Projects/kv-file_PRO/web/src/components/preview/ExtensionPreviewHost.tsx)) for pluggable file format renderers.
+- **Unified Production CLI & Service Daemon (`launch.sh`)**:
+  - Single executable script providing `start` (daemon/foreground), `stop`, `restart`, `status`, `logs`, `build` (`--pro`/`--community`), `keygen`, `dev`, `mock`, and `docker` workflows.
+  - Automatic network LAN IP detection, process PID tracking, and background health probe monitoring.
+- **Mock File Extensions Generator (`scripts/spawn_mock_files.py`)**:
+  - Comprehensive script generating realistic sample assets for all supported PRO formats (CAD, Adobe, fonts, 3D models, code configs) into `./storage`.
+- **Security & Privacy Governance**:
+  - Configured private repository access on GitHub and both Forgejo instances (`git.khoavo.myds.me` and `git.khoavo.vndns.net`) to safeguard proprietary PRO source code.
+
+### Changed
+- Bumped application version to `2.1.0` across Rust backend (`Cargo.toml`) and React frontend (`web/package.json`).
+- Dynamic runtime version detection from Cargo package metadata.
+- Embedded Hugo documentation directly into frontend build artifacts.
+
+---
+
 ## [2.0.0] - 2026-09-14
 
 ### 🚀 Major Milestone Release

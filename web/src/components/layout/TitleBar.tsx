@@ -10,10 +10,13 @@ import {
   Database,
   FlaskConical,
   Settings,
+  Crown,
+  Sparkles,
 } from 'lucide-react';
 import { useExplorerStore } from '../../stores/useExplorerStore';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
+import { useExtensionStore } from '../../stores/useExtensionStore';
 import { getDataSourceMode, setDataSourceMode } from '../../services/api';
 
 export const TitleBar: React.FC = () => {
@@ -28,18 +31,29 @@ export const TitleBar: React.FC = () => {
   } = useExplorerStore();
 
   const { user, logout, setAuthModalOpen } = useAuthStore();
-  const { openSettings } = useSettingsStore();
+  const { openSettings, updatePreferences, preferences } = useSettingsStore();
+  const { isProLicensed, fetchSystemEdition, fetchLicenses } = useExtensionStore();
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
   const currentMode = getDataSourceMode();
 
+  React.useEffect(() => {
+    fetchSystemEdition();
+    fetchLicenses();
+  }, [fetchSystemEdition, fetchLicenses]);
+
+  React.useEffect(() => {
+    setIsDark(document.documentElement.classList.contains('dark'));
+  }, [preferences.theme]);
+
   const toggleTheme = () => {
-    if (isDark) {
-      document.documentElement.classList.remove('dark');
-      setIsDark(false);
-    } else {
+    const nextDark = !isDark;
+    if (nextDark) {
       document.documentElement.classList.add('dark');
-      setIsDark(true);
+    } else {
+      document.documentElement.classList.remove('dark');
     }
+    setIsDark(nextDark);
+    updatePreferences({ theme: nextDark ? 'dark' : 'light' });
   };
 
   const handleToggleMode = () => {
@@ -77,6 +91,9 @@ export const TitleBar: React.FC = () => {
         <div className="flex items-center gap-2 font-bold text-sm sm:text-base tracking-tight text-blue-600 dark:text-blue-400">
           <img src="/icons/favicon.svg" alt="KV Files" className="w-5 h-5 rounded-md shadow-xs object-contain" />
           <span>KV Files</span>
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xs">
+            PRO
+          </span>
         </div>
 
         {/* Multi-Root Storage Selector (Desktop) */}
@@ -163,6 +180,26 @@ export const TitleBar: React.FC = () => {
         >
           {isDark ? <Sun size={17} /> : <Moon size={17} />}
         </button>
+
+        {isProLicensed ? (
+          <button
+            onClick={() => openSettings('extensions')}
+            title="KV File PRO Lifetime Active (Ed25519 Verified)"
+            className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-500/10 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-xs font-semibold hover:bg-amber-500/20 transition-all active:scale-95"
+          >
+            <Crown size={13} className="text-amber-500 shrink-0" />
+            <span>PRO LIFETIME</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => openSettings('extensions')}
+            title="Unlock Pro Extensions & Viewers"
+            className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-500/30 text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-all active:scale-95"
+          >
+            <Sparkles size={13} className="text-blue-500 shrink-0" />
+            <span>UPGRADE PRO</span>
+          </button>
+        )}
 
         <button
           onClick={() => openSettings('account')}

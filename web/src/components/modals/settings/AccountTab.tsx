@@ -150,7 +150,7 @@ export const AccountTab: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-2xl text-xs">
+    <div className="space-y-6 max-w-4xl mx-auto text-xs w-full">
       {/* 1. Profile Overview Header */}
       <section className="p-4 bg-gray-50 dark:bg-[#1e1e1e] rounded-xl border border-gray-200 dark:border-[#333333] flex items-center justify-between">
         <div className="flex items-center gap-3.5">

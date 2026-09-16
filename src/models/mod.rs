@@ -1,3 +1,6 @@
+pub mod payments;
+pub use payments::*;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -14,6 +17,7 @@ pub enum MediaType {
     Doc,
     Spreadsheet,
     Presentation,
+    Font,
     Other,
 }
 
@@ -23,21 +27,25 @@ impl MediaType {
             "mp4" | "mkv" | "mov" | "webm" | "avi" | "flv" | "wmv" | "m4v" | "3gp" | "mts" | "m2ts" | "rmvb" => {
                 MediaType::Video
             }
-            "jpg" | "jpeg" | "png" | "gif" | "webp" | "svg" | "bmp" | "heic" | "heif" | "ico"
-            | "avif" | "tiff" | "tif" | "raw" | "cr2" | "nef" | "dng" => MediaType::Image,
+            "jpg" | "jpeg" | "png" | "gif" | "webp" | "svg" | "svgz" | "eps" | "bmp" | "heic" | "heif" | "ico"
+            | "avif" | "tiff" | "tif" | "raw" | "cr2" | "nef" | "dng"
+            | "cdr" | "cdt" | "cdx" | "cmx" => MediaType::Image,
             "mp3" | "wav" | "flac" | "aac" | "ogg" | "m4a" | "wma" | "opus" | "alac" | "aiff"
             | "aif" | "caf" | "mid" | "midi" => MediaType::Audio,
             "pdf" => MediaType::Pdf,
-            "doc" | "docx" | "dot" | "dotx" | "odt" | "rtf" | "pages" => MediaType::Doc,
+            "doc" | "docx" | "dot" | "dotx" | "odt" | "rtf" | "pages" | "epub" | "mobi" | "djvu" => MediaType::Doc,
             "xls" | "xlsx" | "xlt" | "xltx" | "ods" | "numbers" => MediaType::Spreadsheet,
             "ppt" | "pptx" | "pot" | "potx" | "odp" | "keynote" | "key" => MediaType::Presentation,
             "txt" | "md" | "markdown" | "log" | "csv" => MediaType::Text,
             "rs" | "ts" | "tsx" | "js" | "jsx" | "json" | "yaml" | "yml" | "toml" | "html" | "css"
-            | "scss" | "go" | "py" | "c" | "cpp" | "h" | "sh" | "bash" | "sql" | "xml" | "env"
+            | "scss" | "go" | "py" | "c" | "cpp" | "h" | "sh" | "bash" | "zsh" | "fish" | "sql" | "xml" | "env"
             | "swift" | "kt" | "kts" | "dart" | "vue" | "svelte" | "lua" | "zig" | "ini" | "conf"
-            | "plist" | "mobileconfig" => MediaType::Code,
+            | "plist" | "mobileconfig" | "proto" | "graphql" | "gql" | "prisma" | "tf" | "tfvars"
+            | "astro" | "sol" | "diff" | "patch" | "v" | "gleam" | "ex" | "exs" | "gcode"
+            | "mmd" | "mermaid" | "flow" | "arch" | "diag" => MediaType::Code,
             "zip" | "tar" | "gz" | "bz2" | "xz" | "7z" | "rar" | "apk" | "aab" | "ipa" | "iso"
-            | "dmg" | "pkg" | "deb" | "rpm" => MediaType::Archive,
+            | "dmg" | "pkg" | "deb" | "rpm" | "cbz" | "cbr" => MediaType::Archive,
+            "ttf" | "otf" | "woff" | "woff2" | "eot" => MediaType::Font,
             _ => MediaType::Other,
         }
     }

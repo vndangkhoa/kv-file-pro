@@ -2,7 +2,7 @@ use clap::Parser;
 use std::path::PathBuf;
 
 #[derive(Parser, Debug, Clone)]
-#[command(name = "kv-file", author = "Khoa Vo", version = "2.0.0", about = "kv-file — Modern Self-Hosted File Manager")]
+#[command(name = "kv-file", author = "Khoa Vo", version, about = "kv-file — Modern Self-Hosted File Manager")]
 pub struct Config {
     #[arg(short = 'H', long, env = "KV_HOST", default_value = "0.0.0.0")]
     pub host: String,
@@ -15,6 +15,9 @@ pub struct Config {
 
     #[arg(long, env = "KV_STORAGE_ROOTS", value_delimiter = ':', default_value = "./storage")]
     pub storage_roots: Vec<String>,
+
+    #[arg(long, env = "KV_LICENSE_KEY")]
+    pub license_key: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

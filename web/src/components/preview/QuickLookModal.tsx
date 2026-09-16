@@ -4,8 +4,6 @@ import {
   Download,
   Maximize2,
   Minimize2,
-  Copy,
-  Check,
   Music,
   Film,
   FileText,
@@ -16,9 +14,21 @@ import {
   Code,
   Eye,
   ExternalLink,
+  Workflow,
+  Blocks,
+  Sparkles,
+  Crown,
 } from 'lucide-react';
 import { useExplorerStore } from '../../stores/useExplorerStore';
 import { useDownloadStore } from '../../stores/useDownloadStore';
+import { useExtensionStore } from '../../stores/useExtensionStore';
+import { useSettingsStore } from '../../stores/useSettingsStore';
+import { ExtensionPreviewHost } from './ExtensionPreviewHost';
+import { MarkdownViewer } from '../../extensions/markdown/MarkdownViewer';
+import { SysVisViewer } from '../../extensions/sysvis/SysVisViewer';
+import { isWorkflowJson } from '../../extensions/sysvis/jsonWorkflowParser';
+import { CodeConfigViewer } from './CodeConfigViewer';
+import { VectorStudioViewer } from '../../extensions/vector/VectorStudioViewer';
 import { api } from '../../services/api';
 import { formatHumanSize } from '../../utils/format';
 import { FileItem } from '../../types';
@@ -34,11 +44,13 @@ export const QuickLookModal: React.FC = () => {
     playVideo,
   } = useExplorerStore();
   const { startDownload } = useDownloadStore();
+  const { getPreviewerForExt, getAvailableExtensionForExt, installExtension } = useExtensionStore();
+  const { openSettings } = useSettingsStore();
 
   const [textContent, setTextContent] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [markdownRenderMode, setMarkdownRenderMode] = useState<'rendered' | 'raw'>('rendered');
+  const [jsonRenderMode, setJsonRenderMode] = useState<'flow' | 'code'>('flow');
   const [activeSheetTab, setActiveSheetTab] = useState(0);
   const [activeSlide, setActiveSlide] = useState(1);
 
@@ -48,6 +60,8 @@ export const QuickLookModal: React.FC = () => {
   useEffect(() => {
     if (isQuickLookOpen && currentCandidate) {
       setLockedItem(currentCandidate);
+      setJsonRenderMode('flow');
+      setMarkdownRenderMode('rendered');
     } else if (!isQuickLookOpen) {
       setLockedItem(null);
     }
@@ -90,21 +104,18 @@ export const QuickLookModal: React.FC = () => {
 
   const rootName = item.root_name || currentRoot;
   const rawUrl = api.getRawFileUrl(rootName, item.path);
-  const ext = (item.extension || '').toLowerCase();
-
-  const handleCopyText = () => {
-    if (textContent) {
-      navigator.clipboard.writeText(textContent);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
+  const ext = (item.extension || (item.name ? item.name.split('.').pop() : '') || '').toLowerCase().replace(/^\./, '');
+  const activeExtension = getPreviewerForExt(ext);
+  const availableExtension = !activeExtension ? getAvailableExtensionForExt(ext) : undefined;
+  const isWorkflow =
+    ext === 'json' &&
+    (textContent
+      ? isWorkflowJson(textContent)
+      : /workflow|pipeline|comfy|graph|flow/i.test(item.name || ''));
 
   const handleDownload = () => {
     startDownload(rootName, item);
   };
-
-  const lines = textContent ? textContent.split('\n') : [];
 
   return (
     <div
@@ -116,6 +127,8 @@ export const QuickLookModal: React.FC = () => {
         className={`bg-white dark:bg-[#1e1e1e] sm:rounded-xl shadow-2xl border-0 sm:border border-gray-200 dark:border-[#333333] flex flex-col overflow-hidden transition-all ${
           isFullscreen
             ? 'w-full h-full rounded-none'
+            : (activeExtension || (ext === 'md' && markdownRenderMode === 'rendered') || (isWorkflow && jsonRenderMode === 'flow') || ['svg', 'svgz'].includes(ext))
+            ? 'w-full h-full sm:h-[90vh] sm:max-h-[92vh] sm:w-[94vw] sm:max-w-7xl rounded-none sm:rounded-xl'
             : 'w-full h-full sm:h-[78vh] sm:max-h-[85vh] sm:max-w-4xl rounded-none sm:rounded-xl'
         }`}
       >
@@ -135,18 +148,61 @@ export const QuickLookModal: React.FC = () => {
 
           <div className="flex items-center gap-1 shrink-0">
             {ext === 'md' && textContent && (
-              <button
-                onClick={() =>
-                  setMarkdownRenderMode(markdownRenderMode === 'rendered' ? 'raw' : 'rendered')
-                }
-                className="flex items-center gap-1 px-2.5 py-1.5 sm:py-1 rounded-lg sm:rounded text-xs text-purple-600 dark:text-purple-400 hover:bg-gray-200 dark:hover:bg-[#333333] transition-colors min-h-[36px] sm:min-h-0"
-                title="Toggle Rendered Preview"
-              >
-                {markdownRenderMode === 'rendered' ? <Code size={14} /> : <Eye size={14} />}
-                <span className="hidden sm:inline">
-                  {markdownRenderMode === 'rendered' ? 'Raw Code' : 'Preview'}
-                </span>
-              </button>
+              <div className="flex items-center bg-gray-200/80 dark:bg-[#333333] p-0.5 rounded-lg border border-gray-300/60 dark:border-gray-700 text-xs mr-1">
+                <button
+                  onClick={() => setMarkdownRenderMode('rendered')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                    markdownRenderMode === 'rendered'
+                      ? 'bg-white dark:bg-[#1e1e1e] text-purple-600 dark:text-purple-400 shadow-xs font-semibold'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                  }`}
+                  title="Rendered Markdown Preview"
+                >
+                  <Eye size={13} />
+                  <span className="hidden sm:inline">Preview</span>
+                </button>
+                <button
+                  onClick={() => setMarkdownRenderMode('raw')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                    markdownRenderMode === 'raw'
+                      ? 'bg-white dark:bg-[#1e1e1e] text-purple-600 dark:text-purple-400 shadow-xs font-semibold'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                  }`}
+                  title="Raw Markdown Source"
+                >
+                  <Code size={13} />
+                  <span className="hidden sm:inline">Raw Code</span>
+                </button>
+              </div>
+            )}
+
+            {isWorkflow && (
+              <div className="flex items-center bg-gray-200/80 dark:bg-[#333333] p-0.5 rounded-lg border border-gray-300/60 dark:border-gray-700 text-xs mr-1">
+                <button
+                  onClick={() => setJsonRenderMode('flow')}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                    jsonRenderMode === 'flow'
+                      ? 'bg-white dark:bg-[#1e1e1e] text-indigo-600 dark:text-indigo-400 shadow-xs font-semibold'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                  }`}
+                  title="View animated system flowchart"
+                >
+                  <Workflow size={13} className={jsonRenderMode === 'flow' ? 'animate-pulse' : ''} />
+                  <span className="hidden sm:inline">Flow Chart</span>
+                </button>
+                <button
+                  onClick={() => setJsonRenderMode('code')}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                    jsonRenderMode === 'code'
+                      ? 'bg-white dark:bg-[#1e1e1e] text-indigo-600 dark:text-indigo-400 shadow-xs font-semibold'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                  }`}
+                  title="View raw JSON syntax"
+                >
+                  <Code size={13} />
+                  <span className="hidden sm:inline">Raw JSON</span>
+                </button>
+              </div>
             )}
 
             <button
@@ -177,8 +233,33 @@ export const QuickLookModal: React.FC = () => {
         </div>
 
         {/* Content Viewer Body */}
-        <div className="flex-1 overflow-auto flex items-center justify-center p-2 sm:p-4 bg-gray-50 dark:bg-[#181818]">
-          {item.media_type === 'image' ? (
+        <div className={`flex-1 overflow-auto flex items-center justify-center ${(activeExtension || (ext === 'md' && markdownRenderMode === 'rendered') || (isWorkflow && jsonRenderMode === 'flow') || ['svg', 'svgz'].includes(ext)) && (ext !== 'md' || markdownRenderMode !== 'raw') ? 'p-0' : 'p-2 sm:p-4'} bg-gray-50 dark:bg-[#181818]`}>
+          {isWorkflow && jsonRenderMode === 'flow' ? (
+            <SysVisViewer
+              fileUrl={rawUrl}
+              fileName={item.name}
+              fileSize={item.size}
+              extension={ext}
+              onDownload={handleDownload}
+            />
+          ) : ext === 'md' && markdownRenderMode === 'rendered' ? (
+            <MarkdownViewer
+              fileUrl={rawUrl}
+              fileName={item.name}
+              fileSize={item.size}
+              extension={ext}
+              onDownload={handleDownload}
+            />
+          ) : activeExtension && (ext !== 'md' || markdownRenderMode !== 'raw') ? (
+            <ExtensionPreviewHost
+              extension={activeExtension}
+              fileUrl={rawUrl}
+              fileName={item.name}
+              fileSize={item.size}
+              ext={ext}
+              onDownload={handleDownload}
+            />
+          ) : item.media_type === 'image' ? (
             ['heic', 'heif'].includes(ext) ? (
               <div className="w-full h-full flex flex-col items-center justify-center p-4">
                 <img
@@ -216,6 +297,14 @@ export const QuickLookModal: React.FC = () => {
                   </button>
                 </div>
               </div>
+            ) : ['svg', 'svgz'].includes(ext) ? (
+              <VectorStudioViewer
+                fileUrl={rawUrl}
+                fileName={item.name}
+                fileSize={item.size}
+                extension={ext}
+                onDownload={handleDownload}
+              />
             ) : (
               <img
                 src={rawUrl}
@@ -528,43 +617,76 @@ export const QuickLookModal: React.FC = () => {
               </div>
             </div>
           ) : isTextOrCode && textContent !== null ? (
-            /* 4. Enhanced Text & Code Viewer with Line Numbers */
-            <div className="w-full h-full flex flex-col bg-white dark:bg-[#1e1e1e] rounded border border-gray-200 dark:border-[#333333] overflow-hidden text-xs">
-              <div className="flex items-center justify-between p-1.5 border-b border-gray-200 dark:border-[#333333] bg-gray-50 dark:bg-[#252526]">
-                <div className="flex items-center gap-2 text-[11px] text-gray-500 font-mono px-2">
-                  <span>{lines.length} lines</span>
-                  <span>•</span>
-                  <span>{textContent.length} chars</span>
-                  <span>•</span>
-                  <span className="uppercase text-emerald-600 dark:text-emerald-400">UTF-8</span>
+            /* Enhanced Code & Config Studio Viewer */
+            <CodeConfigViewer
+              content={textContent}
+              fileName={item.name}
+              fileSize={item.size}
+              extension={ext}
+              onDownload={handleDownload}
+            />
+          ) : availableExtension ? (
+            <div className="w-full max-w-md p-6 bg-white dark:bg-[#252526] rounded-2xl shadow-xl border border-gray-200 dark:border-[#333333] flex flex-col items-center gap-4 text-center animate-in zoom-in-95">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
+                <Blocks size={28} />
+              </div>
+              <div>
+                <div className="flex items-center justify-center gap-1.5 mb-1">
+                  <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                    availableExtension.isPaid && !availableExtension.isPurchased
+                      ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800/80'
+                      : 'bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300'
+                  }`}>
+                    {availableExtension.isPaid && !availableExtension.isPurchased ? 'KV File PRO Exclusive' : 'Extension Available'}
+                  </span>
+                  <span className="text-[10px] font-mono text-gray-400">v{availableExtension.version}</span>
                 </div>
-
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={handleCopyText}
-                    className="flex items-center gap-1.5 px-3 py-1.5 sm:py-1 rounded-lg sm:rounded bg-gray-200 dark:bg-[#333333] text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-[#444] transition-colors min-h-[34px] sm:min-h-0"
-                  >
-                    {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
-                    <span>{copied ? 'Copied' : 'Copy Content'}</span>
-                  </button>
-                </div>
+                <h3 className="font-bold text-base text-gray-900 dark:text-gray-100">
+                  {availableExtension.name}
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                  {availableExtension.description}
+                </p>
               </div>
 
-              {/* Code viewer with line numbers */}
-              <div className="flex-1 overflow-auto flex font-mono text-xs selection:bg-blue-500/30">
-                {/* Line number gutter */}
-                <div className="bg-gray-50 dark:bg-[#181818] border-r border-gray-200 dark:border-[#333333] py-3 px-2.5 select-none text-right text-gray-400 font-mono text-[11px] shrink-0">
-                  {lines.map((_, idx) => (
-                    <div key={idx} className="leading-5">
-                      {idx + 1}
-                    </div>
-                  ))}
-                </div>
+              <div className="w-full bg-gray-50 dark:bg-[#1e1e1e] p-3 rounded-xl border border-gray-100 dark:border-gray-800 text-left space-y-1.5 text-xs">
+                <div className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Features Included:</div>
+                {availableExtension.features.slice(0, 3).map((feat, idx) => (
+                  <div key={idx} className="flex items-center gap-2 text-gray-600 dark:text-gray-300 text-[11px]">
+                    <Sparkles size={12} className="text-blue-500 shrink-0" />
+                    <span>{feat}</span>
+                  </div>
+                ))}
+              </div>
 
-                {/* Code text content */}
-                <pre className="flex-1 py-3 px-4 font-mono overflow-auto whitespace-pre leading-5 text-gray-800 dark:text-gray-200">
-                  {textContent}
-                </pre>
+              <div className="flex items-center gap-2 w-full pt-1">
+                {availableExtension.isPaid && !availableExtension.isPurchased ? (
+                  <button
+                    onClick={() => {
+                      setQuickLookOpen(false);
+                      openSettings('extensions');
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-amber-500/20 transition-all active:scale-95"
+                  >
+                    <Crown size={15} className="text-amber-200" />
+                    <span>Unlock with KV File PRO ({availableExtension.price ? `${availableExtension.price.toLocaleString('vi-VN')} ₫` : 'Pro'})</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => installExtension(availableExtension.id)}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-blue-500/20 transition-all"
+                  >
+                    <Blocks size={15} />
+                    <span>Install & Preview File</span>
+                  </button>
+                )}
+                <button
+                  onClick={handleDownload}
+                  title="Download File"
+                  className="p-2.5 bg-gray-100 dark:bg-[#333] hover:bg-gray-200 dark:hover:bg-[#444] text-gray-600 dark:text-gray-300 rounded-xl transition-colors"
+                >
+                  <Download size={16} />
+                </button>
               </div>
             </div>
           ) : (

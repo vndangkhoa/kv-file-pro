@@ -12,6 +12,7 @@ import {
   Sparkles,
   FolderOpen,
   Settings,
+  Blocks,
 } from 'lucide-react';
 import { useExplorerStore } from '../../stores/useExplorerStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
@@ -155,6 +156,16 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose 
         openSettings();
       },
       shortcut: 'Ctrl+,',
+    },
+    {
+      id: 'cmd-extensions',
+      title: 'Open Extension Center',
+      subtitle: 'Browse and install CAD, PSD, and 3D preview plugins',
+      icon: <Blocks size={16} className="text-blue-500" />,
+      action: () => {
+        onClose();
+        openSettings('extensions');
+      },
     },
     {
       id: 'cmd-settings-account',

@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useExplorerStore } from '../stores/useExplorerStore';
+import { useExtensionStore } from '../stores/useExtensionStore';
 import { getDataSourceMode } from '../services/api';
 import { FsEvent } from '../types';
 
@@ -60,6 +61,13 @@ export function useWebSocket() {
         ws.onmessage = (event) => {
           try {
             const fsEvent: FsEvent = JSON.parse(event.data);
+
+            // Handle real-time extension licensing event
+            if (fsEvent.event_type === 'extension_licensed') {
+              useExtensionStore.getState().fetchLicenses();
+              return;
+            }
+
             const state = useExplorerStore.getState();
 
             // Ignore events from other roots

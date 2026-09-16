@@ -26,11 +26,14 @@ import {
   CheckSquare,
   Search,
   Settings,
+  Box,
+  Palette,
 } from 'lucide-react';
 import { useExplorerStore } from '../../stores/useExplorerStore';
 import { useDownloadStore } from '../../stores/useDownloadStore';
 import { useFavoritesStore } from '../../stores/useFavoritesStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
+import { useExtensionStore } from '../../stores/useExtensionStore';
 import { FileIcon } from './FileIcon';
 import { api } from '../../services/api';
 import { formatDisplayPath } from '../layout/AddressBar';
@@ -67,6 +70,7 @@ export const ContextMenu: React.FC = () => {
   const { openSettings } = useSettingsStore();
   const { startDownload } = useDownloadStore();
   const { isFavorite, toggleFavorite, removeFavorite } = useFavoritesStore();
+  const { getPreviewerForExt } = useExtensionStore();
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
@@ -609,19 +613,30 @@ export const ContextMenu: React.FC = () => {
               </button>
             ) : (
               <>
-                <button
-                  onClick={() => {
-                    closeContextMenu();
-                    setQuickLookOpen(true);
-                  }}
-                  className="w-full flex items-center justify-between px-3 py-2.5 md:py-1.5 rounded-xl md:rounded-lg hover:bg-blue-600 hover:text-white transition-colors"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Eye size={15} />
-                    <span className="font-medium">Quick Look</span>
-                  </div>
-                  <kbd className="hidden sm:inline text-[10px] opacity-60">Space</kbd>
-                </button>
+                {(() => {
+                  const itemExt = (item?.extension || (item?.name ? item.name.split('.').pop() : '') || '').toLowerCase();
+                  const itemActiveExt = item && !item.is_dir ? getPreviewerForExt(itemExt) : undefined;
+
+                  return (
+                    <button
+                      onClick={() => {
+                        closeContextMenu();
+                        setQuickLookOpen(true);
+                      }}
+                      className="w-full flex items-center justify-between px-3 py-2.5 md:py-1.5 rounded-xl md:rounded-lg hover:bg-blue-600 hover:text-white transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        {itemActiveExt ? (
+                          itemActiveExt.icon === 'palette' ? <Palette size={15} /> : <Box size={15} />
+                        ) : (
+                          <Eye size={15} />
+                        )}
+                        <span className="font-medium">Quick Look</span>
+                      </div>
+                      <kbd className="hidden sm:inline text-[10px] opacity-60">Space</kbd>
+                    </button>
+                  );
+                })()}
 
                 {isAudio && (
                   <button

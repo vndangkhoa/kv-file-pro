@@ -13,10 +13,13 @@ import {
   Eye,
   EyeOff,
   Download,
+  Box,
+  Palette,
 } from 'lucide-react';
 import { useExplorerStore } from '../../stores/useExplorerStore';
 import { useDownloadStore } from '../../stores/useDownloadStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
+import { useExtensionStore } from '../../stores/useExtensionStore';
 import { api } from '../../services/api';
 
 export const RibbonToolbar: React.FC = () => {
@@ -43,9 +46,13 @@ export const RibbonToolbar: React.FC = () => {
 
   const showHiddenFiles = useSettingsStore((s) => s.preferences.showHiddenFiles);
   const { startDownload } = useDownloadStore();
+  const { getPreviewerForExt } = useExtensionStore();
 
   const hasSelection = selectedItems.length > 0;
   const singleSelection = selectedItems.length === 1;
+  const selectedItem = singleSelection ? selectedItems[0] : null;
+  const selExt = (selectedItem?.extension || (selectedItem?.name ? selectedItem.name.split('.').pop() : '') || '').toLowerCase();
+  const selActiveExt = selectedItem && !selectedItem.is_dir ? getPreviewerForExt(selExt) : undefined;
   const canPaste = Boolean(clipboard && clipboard.items.length > 0);
 
   const handleCut = () => {
@@ -186,10 +193,18 @@ export const RibbonToolbar: React.FC = () => {
         <button
           onClick={() => setQuickLookOpen(true)}
           disabled={!singleSelection}
-          title="Preview"
-          className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333333] text-gray-700 dark:text-gray-300 disabled:opacity-30 disabled:hover:bg-transparent transition-colors shrink-0 min-h-[32px]"
+          title={selActiveExt ? `Open in ${selActiveExt.name} (Space)` : "Preview"}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-gray-700 dark:text-gray-300 disabled:opacity-30 disabled:hover:bg-transparent transition-colors shrink-0 min-h-[32px] ${
+            selActiveExt
+              ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 font-semibold border border-blue-200 dark:border-blue-800/80 shadow-2xs hover:bg-blue-100 dark:hover:bg-blue-900/60'
+              : 'hover:bg-gray-100 dark:hover:bg-[#333333]'
+          }`}
         >
-          <Eye size={14} className="text-indigo-500" />
+          {selActiveExt ? (
+            selActiveExt.icon === 'palette' ? <Palette size={14} className="text-purple-500" /> : <Box size={14} className="text-blue-500" />
+          ) : (
+            <Eye size={14} className="text-indigo-500" />
+          )}
           <span className="hidden md:inline">Preview</span>
         </button>
 

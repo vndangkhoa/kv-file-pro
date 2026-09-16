@@ -109,9 +109,30 @@ Generate share links with expiration dates and optional password protection. Dir
 
 ## 🚀 Quick Start (30 Seconds)
 
-### Option A: One-Command Docker Run
+### Option A: One-Command Native Launch Script (Recommended)
 
-Launch KV Files immediately on port `8866`:
+Start KV Files natively on your machine with the built-in management script:
+
+```bash
+# Start in background (daemon mode)
+./launch.sh start
+
+# Or start in foreground mode
+./launch.sh start --fg
+
+# Check status, logs, or stop
+./launch.sh status
+./launch.sh logs
+./launch.sh stop
+```
+
+Open **`http://localhost:8866`** in your browser to complete initial administrator setup.
+
+---
+
+### Option B: One-Command Docker Run
+
+Launch KV Files via Docker container:
 
 ```bash
 docker run -d \
@@ -127,7 +148,7 @@ Open **`http://localhost:8866`** in your browser to complete initial administrat
 
 ---
 
-### Option B: Docker Compose (Production Ready)
+### Option C: Docker Compose (Production Ready)
 
 Save the following as `docker-compose.yml`:
 
@@ -213,25 +234,60 @@ Configure KV Files via environment variables or command-line flags:
 | `-p, --port` | `KV_PORT` | `8866` | TCP listening port |
 | `--data-dir` | `KV_DATA_DIR` | `./data` | Directory for persistent SQLite DB and sessions |
 | `--storage-roots` | `KV_STORAGE_ROOTS` | `./storage` | Named mounts (`photos:/mnt/photos:docs:/mnt/docs`) |
+| `--license-key` | `KV_LICENSE_KEY` | None | Offline Ed25519 Pro License Key (`KVPRO-...`) |
 | — | `RUST_LOG` | `kv_files=info` | Tracing filter (`error`, `warn`, `info`, `debug`) |
 
 ---
 
-## 🛠️ Native Source Build
+## ⚡ KV Files PRO — Enterprise & Commercial Edition
 
-To compile a self-contained production binary from source:
+**KV Files PRO** extends KV Files with high-performance studio viewports and cryptographic license security:
+
+* **Universal CAD & BIM Viewport**: Native 3D WebGL renderer for AutoCAD (`.dwg`, `.dxf`), Industry Foundation Classes (`.ifc`), and solid models (`.step`, `.stp`, `.iges`, `.stl`, `.obj`). Includes 3D Sectioning, Exploded Assemblies, and ViewCube orientation.
+* **Adobe Creative Suite Studio**: In-browser layer and vector parser for Photoshop (`.psd`, `.psb`), Illustrator (`.ai`, `.eps`), InDesign (`.indd`, `.idml`), and Adobe XD.
+* **Typography Specimen Studio**: Dynamic waterfall scales and Unicode glyph maps for `.ttf`, `.otf`, `.woff`, and `.woff2`.
+* **SysVis Architecture & Flow Animator**: Real-time SVG flow pulses, dagre layout, and Mermaid engine.
+* **Asymmetric Ed25519 Cryptographic Licensing**: Licenses are digitally signed using Ed25519 private keys and verified offline with the embedded master public key. Customer instances never require network phone-home or online DRM check-ins.
+
+### Issue & Verify Licenses via CLI
 
 ```bash
-# 1. Clone repository
-git clone https://github.com/vndangkhoa/kv-file.git && cd kv-file
+# Issue a lifetime license for a customer
+./launch.sh keygen issue --user "acme-corp" --email "team@acme.com" --lifetime
 
-# 2. Build Web Frontend & Hugo Documentation
+# Verify an existing license key
+./launch.sh keygen verify "KVPRO-..."
+```
+
+---
+
+## 🛠️ Native Source Build & Management
+
+### Automated Build & Launch with Script (Fastest)
+
+```bash
+# Build KV Files PRO (default)
+./launch.sh build --pro
+
+# Build Community Edition (core only)
+./launch.sh build --community
+
+# Start background daemon
+./launch.sh start
+```
+
+### Manual Compilation
+
+To compile manually without the launch script:
+
+```bash
+# 1. Build Web Frontend & Hugo Documentation
 cd web && npm install && npm run build && cd ..
 
-# 3. Compile optimized Rust binary
+# 2. Compile optimized Rust binary
 cargo build --release
 
-# 4. Run directly
+# 3. Run directly
 ./target/release/kv-files --port 8866 --storage-roots ./storage
 ```
 

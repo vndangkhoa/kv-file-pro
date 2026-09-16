@@ -3,6 +3,7 @@ mod config;
 mod db;
 mod error;
 mod fs;
+mod licensing;
 mod models;
 mod state;
 mod watcher;
@@ -29,7 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     let config = Config::parse();
-    info!("Starting KV Files v2.0.0");
+    info!("Starting KV Files v{}", env!("CARGO_PKG_VERSION"));
 
     // Ensure data directory exists
     std::fs::create_dir_all(&config.data_dir)?;
@@ -37,6 +38,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("SQLite database path: {}", db_path.display());
 
     let database = Database::new(&db_path)?;
+
+    // Synchronize license key from environment variable (KV_LICENSE_KEY) or license.key file
+    if let Err(e) = database
+        .sync_license_from_file_or_env(config.license_key.as_deref())
+        .await
+    {
+        warn!("Failed to synchronize license key: {}", e);
+    }
 
     // Parse and initialize storage roots
     let roots_config = config.parse_roots();

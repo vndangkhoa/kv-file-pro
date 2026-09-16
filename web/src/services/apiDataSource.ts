@@ -163,6 +163,7 @@ export const apiDataSource: FileSystemDataSource = {
     files: File[],
     onProgress?: (progress: number) => void
   ): Promise<void> {
+    const params = new URLSearchParams({ root, path });
     const formData = new FormData();
     formData.append('root', root);
     formData.append('path', path);
@@ -172,7 +173,7 @@ export const apiDataSource: FileSystemDataSource = {
 
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', `${BASE_URL}/fs/upload`);
+      xhr.open('POST', `${BASE_URL}/fs/upload?${params.toString()}`);
       xhr.withCredentials = true;
 
       if (xhr.upload && onProgress) {

@@ -1,6 +1,6 @@
 [package]
 name = "kv-files"
-version = "2.0.0"
+version = "2.1.0"
 edition = "2021"
 authors = ["Khoa Vo <vndangkhoa>"]
 description = "High-performance self-hosted file manager with Windows Explorer and macOS Miller Columns UI"
@@ -41,3 +41,11 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Embedded Assets (SPA)
 rust-embed = { version = "8.5", features = ["mime-guess"] }
 totp-rs = { version = "6.0.0", features = ["qr", "gen_secret"] }
+
+# Payments & HTTP Client (MoMo API v2)
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+ed25519-dalek = "2.1"
+base64 = "0.23.1"

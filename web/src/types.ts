@@ -1,4 +1,4 @@
-export type MediaType = 'video' | 'image' | 'audio' | 'pdf' | 'text' | 'code' | 'archive' | 'doc' | 'spreadsheet' | 'presentation' | 'other';
+export type MediaType = 'video' | 'image' | 'audio' | 'pdf' | 'text' | 'code' | 'archive' | 'doc' | 'spreadsheet' | 'presentation' | 'font' | 'other';
 
 export interface FileItem {
   name: string;
@@ -106,7 +106,7 @@ export interface PublicShareBundleItem {
   size: number;
   human_size: string;
   mime_type: string;
-  media_type: 'video' | 'image' | 'audio' | 'pdf' | 'text' | 'code' | 'archive' | 'doc' | 'spreadsheet' | 'presentation' | 'other';
+  media_type: MediaType;
   extension?: string;
 }
 
@@ -121,7 +121,7 @@ export interface PublicShareInfo {
   size: number;
   human_size: string;
   mime_type: string;
-  media_type: 'video' | 'image' | 'audio' | 'pdf' | 'text' | 'code' | 'archive' | 'doc' | 'spreadsheet' | 'presentation' | 'other';
+  media_type: MediaType;
   extension?: string;
   has_password: boolean;
   requires_password?: boolean;
@@ -145,8 +145,110 @@ export interface TrashItem {
 export type ViewMode = 'columns' | 'list' | 'grid';
 
 export interface FsEvent {
-  event_type: 'created' | 'modified' | 'deleted' | 'renamed';
+  event_type: 'created' | 'modified' | 'deleted' | 'renamed' | 'extension_licensed' | (string & {});
   root_name: string;
   path: string;
   is_dir: boolean;
 }
+
+export type ExtensionCategory = 'all' | 'previewer' | 'editor' | 'utility';
+
+export const PRO_BUNDLE_ID = 'kv-files-pro-all';
+export const PRO_BUNDLE_PRICE = 199000;
+
+export interface ExtensionManifest {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  author: string;
+  icon: 'box' | 'layers' | 'image' | 'code' | 'file-text' | 'palette' | 'cpu' | 'type' | 'workflow';
+  category: 'previewer' | 'editor' | 'utility';
+  supportedExtensions: string[];
+  supportedMimeTypes?: string[];
+  size: string;
+  badge?: string;
+  rating?: number;
+  downloads?: string;
+  installed?: boolean;
+  enabled?: boolean;
+  features: string[];
+  price?: number;        // Price in VND (e.g. 99000)
+  isPaid?: boolean;      // True if commercial/paid extension
+  isPurchased?: boolean; // True if valid license exists in SQLite
+}
+
+export interface PaymentCreateResponse {
+  order_id: string;
+  extension_id: string;
+  amount: number;
+  pay_url: string;
+  qr_code_url?: string;
+  deeplink?: string;
+  status: string;
+  is_mock: boolean;
+  phone_number?: string;
+  receiver_name?: string;
+}
+
+export interface ExtensionLicense {
+  id: string;
+  user_id: string;
+  extension_id: string;
+  order_id: string;
+  license_key: string;
+  purchased_at: string;
+}
+
+export interface OrderStatusResponse {
+  id: string;
+  user_id: string;
+  extension_id: string;
+  amount: number;
+  status: 'PENDING' | 'AWAITING_VERIFICATION' | 'PAID' | 'FAILED' | 'CANCELLED' | string;
+  momo_trans_id?: string;
+  user_note?: string;
+  payment_method?: string;
+  license_key?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminOrdersListResponse {
+  orders: OrderStatusResponse[];
+  total: number;
+}
+
+export interface ActivateLicenseRequest {
+  code: string;
+}
+
+export interface ActivateLicenseResponse {
+  success: boolean;
+  extension_id: string;
+  license_key: string;
+  message: string;
+}
+
+export interface PreviewExtensionProps {
+  fileUrl: string;
+  fileName: string;
+  fileSize: number;
+  extension: string;
+  onDownload?: () => void;
+}
+
+export interface SystemEditionInfo {
+  edition: 'COMMUNITY' | 'PRO' | string;
+  name: string;
+  version: string;
+  is_licensed: boolean;
+  license_tier?: string;
+  license_id?: string;
+  customer_email?: string;
+  is_lifetime: boolean;
+  expires_at?: number;
+  features: string[];
+}
+
+

@@ -1,8 +1,8 @@
 use crate::error::{AppError, Result};
-use crate::models::{ShareItem, TrashItem, User, format_human_size};
+use crate::models::{ExtensionLicense, ExtensionOrder, ShareItem, TrashItem, User, format_human_size};
 use rusqlite::{params, Connection};
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
@@ -10,13 +10,16 @@ use uuid::Uuid;
 #[derive(Clone)]
 pub struct Database {
     conn: Arc<Mutex<Connection>>,
+    data_dir: PathBuf,
 }
 
 impl Database {
     pub fn new(db_path: &Path) -> Result<Self> {
-        if let Some(parent) = db_path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
+        let data_dir = db_path
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .to_path_buf();
+        std::fs::create_dir_all(&data_dir)?;
 
         let conn = Connection::open(db_path)
             .map_err(|e| AppError::Db(format!("Failed to open SQLite database: {}", e)))?;
@@ -33,6 +36,7 @@ impl Database {
 
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
+            data_dir,
         })
     }
 
@@ -77,6 +81,29 @@ impl Database {
             CREATE TABLE IF NOT EXISTS settings (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS extension_orders (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                extension_id TEXT NOT NULL,
+                amount INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                momo_trans_id TEXT,
+                user_note TEXT,
+                payment_method TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS extension_licenses (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                extension_id TEXT NOT NULL,
+                order_id TEXT NOT NULL,
+                license_key TEXT NOT NULL,
+                purchased_at TEXT NOT NULL,
+                UNIQUE(user_id, extension_id)
             );
             ",
         )
@@ -127,6 +154,30 @@ impl Database {
                 .map_err(|e| AppError::Db(e.to_string()))?;
         }
 
+        let mut stmt_orders = conn
+            .prepare("PRAGMA table_info(extension_orders)")
+            .map_err(|e| AppError::Db(e.to_string()))?;
+        let order_columns: Vec<String> = stmt_orders
+            .query_map([], |row| row.get(1))
+            .map_err(|e| AppError::Db(e.to_string()))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        if !order_columns.contains(&"user_note".to_string()) {
+            conn.execute("ALTER TABLE extension_orders ADD COLUMN user_note TEXT", [])
+                .map_err(|e| AppError::Db(e.to_string()))?;
+        }
+        if !order_columns.contains(&"payment_method".to_string()) {
+            conn.execute("ALTER TABLE extension_orders ADD COLUMN payment_method TEXT", [])
+                .map_err(|e| AppError::Db(e.to_string()))?;
+        }
+
+        // Production-grade indexes for high-concurrency order lookup & licensing
+        let _ = conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_user_id ON extension_orders(user_id)", []);
+        let _ = conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_status ON extension_orders(status)", []);
+        let _ = conn.execute("CREATE INDEX IF NOT EXISTS idx_licenses_user_id ON extension_licenses(user_id)", []);
+        let _ = conn.execute("CREATE INDEX IF NOT EXISTS idx_licenses_key ON extension_licenses(license_key)", []);
+
         Ok(())
     }
 
@@ -152,6 +203,25 @@ impl Database {
             params![id, username, password_hash, role, created_at],
         )
         .map_err(|e| AppError::Db(format!("Failed to create user: {}", e)))?;
+
+        // Auto-assign pro license if global pro license exists in settings
+        let lic_key_opt: Option<String> = conn
+            .query_row(
+                "SELECT value FROM settings WHERE key = 'pro_license_key'",
+                [],
+                |row| row.get(0),
+            )
+            .ok();
+
+        if let Some(lic_key) = lic_key_opt {
+            let lic_id = format!("LIC-{}", Uuid::new_v4());
+            let _ = conn.execute(
+                "INSERT INTO extension_licenses (id, user_id, extension_id, order_id, license_key, purchased_at)
+                 VALUES (?1, ?2, 'kv-files-pro-all', 'ORD-GLOBAL', ?3, ?4)
+                 ON CONFLICT(user_id, extension_id) DO NOTHING",
+                params![lic_id, id, lic_key, created_at],
+            );
+        }
 
         Ok(User {
             id,
@@ -638,6 +708,16 @@ impl Database {
         Ok(map)
     }
 
+    #[allow(dead_code)]
+    pub async fn get_setting(&self, key: &str) -> Result<Option<String>> {
+        let conn = self.conn.lock().await;
+        let mut stmt = conn
+            .prepare("SELECT value FROM settings WHERE key = ?1 LIMIT 1")
+            .map_err(|e| AppError::Db(e.to_string()))?;
+        let res = stmt.query_row(params![key], |row| row.get::<_, String>(0)).ok();
+        Ok(res)
+    }
+
     pub async fn set_setting(&self, key: &str, value: &str) -> Result<()> {
         let conn = self.conn.lock().await;
         conn.execute(
@@ -646,5 +726,581 @@ impl Database {
         )
         .map_err(|e| AppError::Db(format!("Failed to save setting '{}': {}", key, e)))?;
         Ok(())
+    }
+
+    // --- Extension Orders & Licenses (MoMo Payment) ---
+    pub async fn create_extension_order(&self, order: &ExtensionOrder) -> Result<()> {
+        let conn = self.conn.lock().await;
+        conn.execute(
+            "INSERT INTO extension_orders (id, user_id, extension_id, amount, status, momo_trans_id, user_note, payment_method, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            params![
+                order.id,
+                order.user_id,
+                order.extension_id,
+                order.amount,
+                order.status,
+                order.momo_trans_id,
+                order.user_note,
+                order.payment_method,
+                order.created_at,
+                order.updated_at,
+            ],
+        )
+        .map_err(|e| AppError::Db(format!("Failed to create extension order: {}", e)))?;
+        Ok(())
+    }
+
+    pub async fn update_order_status(
+        &self,
+        order_id: &str,
+        status: &str,
+        momo_trans_id: Option<&str>,
+    ) -> Result<()> {
+        let conn = self.conn.lock().await;
+        let now = chrono::Utc::now().to_rfc3339();
+        conn.execute(
+            "UPDATE extension_orders SET status = ?1, momo_trans_id = COALESCE(?2, momo_trans_id), updated_at = ?3 WHERE id = ?4",
+            params![status, momo_trans_id, now, order_id],
+        )
+        .map_err(|e| AppError::Db(format!("Failed to update order status: {}", e)))?;
+        Ok(())
+    }
+
+    pub async fn update_order_awaiting_verification(
+        &self,
+        order_id: &str,
+        user_note: Option<&str>,
+        trans_id: Option<&str>,
+    ) -> Result<()> {
+        let conn = self.conn.lock().await;
+        let now = chrono::Utc::now().to_rfc3339();
+        conn.execute(
+            "UPDATE extension_orders 
+             SET status = 'AWAITING_VERIFICATION', 
+                 user_note = COALESCE(?1, user_note), 
+                 momo_trans_id = COALESCE(?2, momo_trans_id), 
+                 updated_at = ?3 
+             WHERE id = ?4",
+            params![user_note, trans_id, now, order_id],
+        )
+        .map_err(|e| AppError::Db(format!("Failed to update order to awaiting verification: {}", e)))?;
+        Ok(())
+    }
+
+    pub async fn get_extension_order(&self, order_id: &str) -> Result<Option<ExtensionOrder>> {
+        let conn = self.conn.lock().await;
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, user_id, extension_id, amount, status, momo_trans_id, user_note, payment_method, created_at, updated_at 
+                 FROM extension_orders WHERE id = ?1",
+            )
+            .map_err(|e| AppError::Db(e.to_string()))?;
+
+        let mut rows = stmt
+            .query_map(params![order_id], |row| {
+                Ok(ExtensionOrder {
+                    id: row.get(0)?,
+                    user_id: row.get(1)?,
+                    extension_id: row.get(2)?,
+                    amount: row.get(3)?,
+                    status: row.get(4)?,
+                    momo_trans_id: row.get(5)?,
+                    user_note: row.get(6)?,
+                    payment_method: row.get(7)?,
+                    created_at: row.get(8)?,
+                    updated_at: row.get(9)?,
+                })
+            })
+            .map_err(|e| AppError::Db(e.to_string()))?;
+
+        if let Some(row) = rows.next() {
+            Ok(Some(row.map_err(|e| AppError::Db(e.to_string()))?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub async fn list_extension_orders(
+        &self,
+        status_filter: Option<&str>,
+        limit: usize,
+        offset: usize,
+    ) -> Result<(Vec<ExtensionOrder>, usize)> {
+        let conn = self.conn.lock().await;
+        let filter_param = match status_filter {
+            Some(s) if !s.trim().is_empty() && !s.eq_ignore_ascii_case("ALL") => {
+                Some(s.trim().to_uppercase())
+            }
+            _ => None,
+        };
+
+        let total: usize = if let Some(ref f) = filter_param {
+            conn.query_row(
+                "SELECT COUNT(*) FROM extension_orders WHERE status = ?1",
+                params![f],
+                |row| row.get(0),
+            )
+        } else {
+            conn.query_row("SELECT COUNT(*) FROM extension_orders", [], |row| {
+                row.get(0)
+            })
+        }
+        .unwrap_or(0);
+
+        let mut list = Vec::new();
+        if let Some(ref f) = filter_param {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT id, user_id, extension_id, amount, status, momo_trans_id, user_note, payment_method, created_at, updated_at 
+                     FROM extension_orders 
+                     WHERE status = ?1 
+                     ORDER BY created_at DESC 
+                     LIMIT ?2 OFFSET ?3",
+                )
+                .map_err(|e| AppError::Db(e.to_string()))?;
+            let rows = stmt
+                .query_map(params![f, limit as i64, offset as i64], |row| {
+                    Ok(ExtensionOrder {
+                        id: row.get(0)?,
+                        user_id: row.get(1)?,
+                        extension_id: row.get(2)?,
+                        amount: row.get(3)?,
+                        status: row.get(4)?,
+                        momo_trans_id: row.get(5)?,
+                        user_note: row.get(6)?,
+                        payment_method: row.get(7)?,
+                        created_at: row.get(8)?,
+                        updated_at: row.get(9)?,
+                    })
+                })
+                .map_err(|e| AppError::Db(e.to_string()))?;
+            for r in rows.flatten() {
+                list.push(r);
+            }
+        } else {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT id, user_id, extension_id, amount, status, momo_trans_id, user_note, payment_method, created_at, updated_at 
+                     FROM extension_orders 
+                     ORDER BY created_at DESC 
+                     LIMIT ?1 OFFSET ?2",
+                )
+                .map_err(|e| AppError::Db(e.to_string()))?;
+            let rows = stmt
+                .query_map(params![limit as i64, offset as i64], |row| {
+                    Ok(ExtensionOrder {
+                        id: row.get(0)?,
+                        user_id: row.get(1)?,
+                        extension_id: row.get(2)?,
+                        amount: row.get(3)?,
+                        status: row.get(4)?,
+                        momo_trans_id: row.get(5)?,
+                        user_note: row.get(6)?,
+                        payment_method: row.get(7)?,
+                        created_at: row.get(8)?,
+                        updated_at: row.get(9)?,
+                    })
+                })
+                .map_err(|e| AppError::Db(e.to_string()))?;
+            for r in rows.flatten() {
+                list.push(r);
+            }
+        }
+
+        Ok((list, total))
+    }
+
+    pub async fn get_or_create_license_signing_secret(&self) -> Result<String> {
+        let conn = self.conn.lock().await;
+        let mut stmt = conn
+            .prepare("SELECT value FROM settings WHERE key = 'license_signing_secret'")
+            .map_err(|e| AppError::Db(e.to_string()))?;
+
+        let existing: Option<String> = stmt.query_row([], |row| row.get(0)).ok();
+
+        if let Some(secret) = existing {
+            if !secret.trim().is_empty() {
+                return Ok(secret);
+            }
+        }
+
+        let new_secret = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES ('license_signing_secret', ?1)
+             ON CONFLICT(key) DO UPDATE SET value = ?1",
+            params![new_secret],
+        )
+        .map_err(|e| AppError::Db(e.to_string()))?;
+
+        Ok(new_secret)
+    }
+
+    pub async fn grant_extension_license(&self, license: &ExtensionLicense) -> Result<()> {
+        let conn = self.conn.lock().await;
+        conn.execute(
+            "INSERT INTO extension_licenses (id, user_id, extension_id, order_id, license_key, purchased_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(user_id, extension_id) DO UPDATE SET order_id = ?4, license_key = ?5, purchased_at = ?6",
+            params![
+                license.id,
+                license.user_id,
+                license.extension_id,
+                license.order_id,
+                license.license_key,
+                license.purchased_at,
+            ],
+        )
+        .map_err(|e| AppError::Db(format!("Failed to grant extension license: {}", e)))?;
+
+        // If Pro Bundle license, persist to license.key and settings
+        if license.extension_id == "kv-files-pro-all" {
+            let _ = conn.execute(
+                "INSERT INTO settings (key, value) VALUES ('pro_license_key', ?1)
+                 ON CONFLICT(key) DO UPDATE SET value = ?1",
+                params![license.license_key],
+            );
+            let _ = std::fs::write(self.data_dir.join("license.key"), &license.license_key);
+        }
+
+        Ok(())
+    }
+
+    pub async fn get_user_extension_licenses(&self, user_id: &str) -> Result<Vec<ExtensionLicense>> {
+        let conn = self.conn.lock().await;
+        let mut stmt = conn
+            .prepare("SELECT id, user_id, extension_id, order_id, license_key, purchased_at FROM extension_licenses WHERE user_id = ?1")
+            .map_err(|e| AppError::Db(e.to_string()))?;
+
+        let rows = stmt
+            .query_map(params![user_id], |row| {
+                Ok(ExtensionLicense {
+                    id: row.get(0)?,
+                    user_id: row.get(1)?,
+                    extension_id: row.get(2)?,
+                    order_id: row.get(3)?,
+                    license_key: row.get(4)?,
+                    purchased_at: row.get(5)?,
+                })
+            })
+            .map_err(|e| AppError::Db(e.to_string()))?;
+
+        let mut list = Vec::new();
+        for r in rows {
+            if let Ok(l) = r {
+                list.push(l);
+            }
+        }
+        Ok(list)
+    }
+
+    pub async fn has_extension_license(&self, user_id: &str, extension_id: &str) -> Result<bool> {
+        let conn = self.conn.lock().await;
+        let mut stmt = conn
+            .prepare(
+                "SELECT COUNT(*) FROM extension_licenses 
+                 WHERE user_id = ?1 AND (extension_id = ?2 OR extension_id = 'kv-files-pro-all')",
+            )
+            .map_err(|e| AppError::Db(e.to_string()))?;
+
+        let count: i64 = stmt
+            .query_row(params![user_id, extension_id], |row| row.get(0))
+            .unwrap_or(0);
+
+        Ok(count > 0)
+    }
+
+    pub async fn get_license_by_order_id(&self, order_id: &str) -> Result<Option<ExtensionLicense>> {
+        let conn = self.conn.lock().await;
+        let mut stmt = conn
+            .prepare("SELECT id, user_id, extension_id, order_id, license_key, purchased_at FROM extension_licenses WHERE order_id = ?1 LIMIT 1")
+            .map_err(|e| AppError::Db(e.to_string()))?;
+
+        let mut rows = stmt
+            .query_map(params![order_id], |row| {
+                Ok(ExtensionLicense {
+                    id: row.get(0)?,
+                    user_id: row.get(1)?,
+                    extension_id: row.get(2)?,
+                    order_id: row.get(3)?,
+                    license_key: row.get(4)?,
+                    purchased_at: row.get(5)?,
+                })
+            })
+            .map_err(|e| AppError::Db(e.to_string()))?;
+
+        if let Some(row) = rows.next() {
+            Ok(Some(row.map_err(|e| AppError::Db(e.to_string()))?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub async fn activate_extension_license_for_user(
+        &self,
+        user_id: &str,
+        code: &str,
+    ) -> Result<ExtensionLicense> {
+        let code_trimmed = code.trim();
+        if code_trimmed.is_empty() {
+            return Err(AppError::BadRequest("Activation code cannot be empty".into()));
+        }
+
+        let conn = self.conn.lock().await;
+
+        // 1. Look for existing license by license_key or order_id
+        let mut lic_stmt = conn
+            .prepare(
+                "SELECT extension_id, order_id, license_key, purchased_at 
+                 FROM extension_licenses 
+                 WHERE license_key = ?1 OR order_id = ?1 
+                 LIMIT 1",
+            )
+            .map_err(|e| AppError::Db(e.to_string()))?;
+
+        let found_license = lic_stmt
+            .query_row(params![code_trimmed], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                ))
+            })
+            .ok();
+
+        let (extension_id, order_id, license_key, purchased_at) = match found_license {
+            Some(data) => data,
+            None => {
+                // 2. Look for confirmed/paid order by order id or MoMo trans_id
+                let mut order_stmt = conn
+                    .prepare(
+                        "SELECT id, extension_id, momo_trans_id, updated_at 
+                         FROM extension_orders 
+                         WHERE (id = ?1 OR momo_trans_id = ?1) AND status = 'PAID' 
+                         LIMIT 1",
+                    )
+                    .map_err(|e| AppError::Db(e.to_string()))?;
+
+                let found_order = order_stmt
+                    .query_row(params![code_trimmed], |row| {
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            row.get::<_, String>(1)?,
+                            row.get::<_, Option<String>>(2)?,
+                            row.get::<_, String>(3)?,
+                        ))
+                    })
+                    .ok();
+
+                if let Some((ord_id, ext_id, trans_id_opt, p_at)) = found_order {
+                    let trans_id = trans_id_opt.unwrap_or_else(|| "TRANS".into());
+                    let suffix = if ord_id.len() >= 6 {
+                        &ord_id[ord_id.len() - 6..]
+                    } else {
+                        &ord_id
+                    };
+                    let key = if ext_id == "kv-files-pro-all" {
+                        format!("KV-PRO-{}", suffix)
+                    } else {
+                        format!("MOMO-{}-{}", trans_id, suffix)
+                    };
+                    (ext_id, ord_id, key, p_at)
+                } else if let Ok(payload) = crate::licensing::verify_pro_license(code_trimmed, None) {
+                    let now = chrono::Utc::now().to_rfc3339();
+                    (
+                        payload.tier,
+                        payload.id,
+                        code_trimmed.to_string(),
+                        now,
+                    )
+                } else {
+                    let instance_secret = {
+                        let mut stmt = conn
+                            .prepare("SELECT value FROM settings WHERE key = 'license_signing_secret'")
+                            .map_err(|e| AppError::Db(e.to_string()))?;
+                        stmt.query_row([], |row| row.get::<_, String>(0)).ok()
+                    };
+                    let momo_secret = std::env::var("MOMO_SECRET_KEY")
+                        .unwrap_or_else(|_| "K951B6PE1wa8ngfBWja1mi1jWbvZ0eeq".into());
+                    let mut candidate_secrets = vec![crate::api::payments::DEFAULT_LICENSE_SECRET, &momo_secret];
+                    if let Some(ref is) = instance_secret {
+                        candidate_secrets.push(is);
+                    }
+
+                    if let Some(ext_id) = crate::api::payments::verify_license_against_secrets(code_trimmed, &candidate_secrets) {
+                        let now = chrono::Utc::now().to_rfc3339();
+                        (
+                            ext_id,
+                            format!("ORD-KEY-{}", Uuid::new_v4()),
+                            code_trimmed.to_uppercase(),
+                            now,
+                        )
+                    } else {
+                        return Err(AppError::NotFound(
+                            "Invalid activation code or payment not confirmed yet".into(),
+                        ));
+                    }
+                }
+            }
+        };
+
+        // 3. Grant/bind license to current user
+        let new_id = format!("LIC-{}", Uuid::new_v4());
+        conn.execute(
+            "INSERT INTO extension_licenses (id, user_id, extension_id, order_id, license_key, purchased_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(user_id, extension_id) DO UPDATE SET order_id = ?4, license_key = ?5, purchased_at = ?6",
+            params![
+                new_id,
+                user_id,
+                extension_id,
+                order_id,
+                license_key,
+                purchased_at,
+            ],
+        )
+        .map_err(|e| AppError::Db(format!("Failed to activate extension license: {}", e)))?;
+
+        // 4. Save to persistent license.key file and settings if Pro
+        if extension_id == "kv-files-pro-all" {
+            let _ = conn.execute(
+                "INSERT INTO settings (key, value) VALUES ('pro_license_key', ?1)
+                 ON CONFLICT(key) DO UPDATE SET value = ?1",
+                params![license_key],
+            );
+            let _ = std::fs::write(self.data_dir.join("license.key"), &license_key);
+        }
+
+        Ok(ExtensionLicense {
+            id: new_id,
+            user_id: user_id.to_string(),
+            extension_id,
+            order_id,
+            license_key,
+            purchased_at,
+        })
+    }
+
+    pub async fn sync_license_from_file_or_env(&self, env_key: Option<&str>) -> Result<()> {
+        let key_to_apply = if let Some(k) = env_key {
+            let trimmed = k.trim();
+            if !trimmed.is_empty() {
+                Some(trimmed.to_string())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let key = match key_to_apply {
+            Some(k) => {
+                let _ = std::fs::write(self.data_dir.join("license.key"), &k);
+                k
+            }
+            None => {
+                let file_path = self.data_dir.join("license.key");
+                if file_path.exists() {
+                    match std::fs::read_to_string(&file_path) {
+                        Ok(content) => {
+                            let trimmed = content.trim().to_string();
+                            if !trimmed.is_empty() {
+                                trimmed
+                            } else {
+                                return Ok(());
+                            }
+                        }
+                        Err(_) => return Ok(()),
+                    }
+                } else {
+                    return Ok(());
+                }
+            }
+        };
+
+        let conn = self.conn.lock().await;
+
+        // Verify cryptographic validity before injecting
+        let instance_secret = {
+            let mut stmt = conn
+                .prepare("SELECT value FROM settings WHERE key = 'license_signing_secret'")
+                .map_err(|e| AppError::Db(e.to_string()))?;
+            stmt.query_row([], |row| row.get::<_, String>(0)).ok()
+        };
+        let momo_secret = std::env::var("MOMO_SECRET_KEY")
+            .unwrap_or_else(|_| "K951B6PE1wa8ngfBWja1mi1jWbvZ0eeq".into());
+        let mut candidate_secrets = vec![crate::api::payments::DEFAULT_LICENSE_SECRET, &momo_secret];
+        if let Some(ref is) = instance_secret {
+            candidate_secrets.push(is);
+        }
+        let is_valid_ed25519 = crate::licensing::verify_pro_license(&key, None).is_ok();
+        let is_valid_hmac = if !is_valid_ed25519 {
+            crate::api::payments::verify_license_against_secrets(&key, &candidate_secrets).is_some()
+        } else {
+            false
+        };
+
+        if !is_valid_ed25519 && !is_valid_hmac {
+            tracing::warn!("Ignoring invalid or unsigned license key in license.key: {}", key);
+            return Ok(());
+        }
+
+        let _ = conn.execute(
+            "INSERT INTO settings (key, value) VALUES ('pro_license_key', ?1)
+             ON CONFLICT(key) DO UPDATE SET value = ?1",
+            params![key],
+        );
+
+        let mut stmt = conn
+            .prepare("SELECT id FROM users")
+            .map_err(|e| AppError::Db(e.to_string()))?;
+        let user_ids: Vec<String> = stmt
+            .query_map([], |row| row.get(0))
+            .map_err(|e| AppError::Db(e.to_string()))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        let now = chrono::Utc::now().to_rfc3339();
+        for uid in user_ids {
+            let lic_id = format!("LIC-{}", Uuid::new_v4());
+            let _ = conn.execute(
+                "INSERT INTO extension_licenses (id, user_id, extension_id, order_id, license_key, purchased_at)
+                 VALUES (?1, ?2, 'kv-files-pro-all', 'ORD-AUTO-SYNC', ?3, ?4)
+                 ON CONFLICT(user_id, extension_id) DO UPDATE SET license_key = ?3",
+                params![lic_id, uid, key, now],
+            );
+        }
+
+        Ok(())
+    }
+
+    pub async fn get_system_pro_license(&self) -> Result<Option<crate::licensing::LicensePayload>> {
+        let conn = self.conn.lock().await;
+        let mut stmt = conn
+            .prepare("SELECT value FROM settings WHERE key = 'pro_license_key'")
+            .map_err(|e| AppError::Db(e.to_string()))?;
+        let key_opt: Option<String> = stmt.query_row([], |row| row.get(0)).ok();
+        drop(stmt);
+        drop(conn);
+
+        if let Some(key) = key_opt {
+            if let Ok(payload) = crate::licensing::verify_pro_license(&key, None) {
+                return Ok(Some(payload));
+            }
+            let trimmed = key.trim();
+            if !trimmed.is_empty() && (trimmed.starts_with("KV-") || trimmed.starts_with("MOMO-")) {
+                return Ok(Some(crate::licensing::LicensePayload {
+                    id: "LEGACY-LIC".into(),
+                    user: "admin".into(),
+                    tier: "kv-files-pro-all".into(),
+                    customer_email: None,
+                    issued_at: chrono::Utc::now().timestamp(),
+                    expires_at: None,
+                    features: vec!["all".into()],
+                }));
+            }
+        }
+        Ok(None)
     }
 }

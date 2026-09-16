@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod fs;
+pub mod payments;
 pub mod settings;
 pub mod shares;
 pub mod static_files;
@@ -9,6 +10,7 @@ pub mod ws;
 
 use crate::state::AppState;
 use axum::{
+    extract::DefaultBodyLimit,
     routing::{delete, get, post},
     Router,
 };
@@ -27,13 +29,29 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/v1/auth/setup", post(auth::initial_setup))
         .route("/api/v1/auth/login", post(auth::login))
         .route("/api/v1/auth/2fa/verify", post(auth::verify_2fa_login))
+        // MoMo IPN Webhook (server-to-server callback)
+        .route("/api/v1/payments/momo/ipn", post(payments::momo_ipn_webhook))
         // Public share endpoints
         .route("/api/v1/public/share/{token}", get(shares::get_public_share))
         .route("/api/v1/public/share/{token}/download", get(shares::download_public_share))
         .route("/api/v1/public/share/{token}/raw", get(shares::raw_public_share))
+        // System edition & license telemetry
+        .route("/api/v1/system/edition", get(settings::get_system_edition))
         .with_state(state.clone());
 
     let protected_router = Router::new()
+        // Extension Store & MoMo Payments
+        .route("/api/v1/payments/momo/create", post(payments::create_momo_payment))
+        .route("/api/v1/payments/licenses", get(payments::get_user_licenses))
+        .route("/api/v1/payments/licenses/activate", post(payments::activate_license_code))
+        .route("/api/v1/payments/orders/{id}", get(payments::check_order_status))
+        .route("/api/v1/payments/orders/{id}/submit-transfer", post(payments::submit_transfer_details))
+        .route("/api/v1/payments/orders/{id}/cancel", post(payments::cancel_order))
+        .route("/api/v1/payments/confirm/{id}", post(payments::submit_transfer_details))
+        .route("/api/v1/payments/admin/orders", get(payments::admin_list_orders))
+        .route("/api/v1/payments/admin/orders/{id}/approve", post(payments::admin_approve_order))
+        .route("/api/v1/payments/admin/orders/{id}/reject", post(payments::admin_reject_order))
+        .route("/api/v1/payments/dev/simulate/{id}", post(payments::dev_simulate_payment))
         // Authenticated user operations
         .route("/api/v1/auth/me", get(auth::get_me))
         .route("/api/v1/auth/logout", post(auth::logout))
@@ -57,7 +75,10 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/v1/fs/search", get(fs::search_items))
         .route("/api/v1/fs/raw", get(fs::stream_file))
         .route("/api/v1/fs/download", get(fs::download_file))
-        .route("/api/v1/fs/upload", post(upload::upload_file))
+        .route(
+            "/api/v1/fs/upload",
+            post(upload::upload_file).layer(DefaultBodyLimit::disable()),
+        )
         // Recycle Bin
         .route("/api/v1/trash/list", get(trash::list_trash))
         .route("/api/v1/trash/restore", post(trash::restore_trash))

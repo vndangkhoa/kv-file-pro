@@ -1,73 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronRight, Download, Share2, Eye, Trash2, Music, Film, Play, MoreVertical, ShieldAlert, ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronRight, Download, Share2, Eye, Trash2, Music, Film, MoreVertical, ShieldAlert, ChevronDown, ChevronUp, Box, Palette, Blocks, Crown } from 'lucide-react';
 import { useExplorerStore } from '../../stores/useExplorerStore';
 import { useDownloadStore } from '../../stores/useDownloadStore';
+import { useExtensionStore } from '../../stores/useExtensionStore';
+import { useSettingsStore } from '../../stores/useSettingsStore';
 import { FileIcon } from '../common/FileIcon';
 import { FileItem } from '../../types';
 import { api } from '../../services/api';
 import { formatDate } from '../../utils/format';
 import { getSystemFolderHint } from '../../utils/systemFolders';
+import { UniversalInspectorPreview } from '../preview/UniversalInspectorPreview';
 
-const InlineTextInspectorPreview: React.FC<{ item: FileItem; onOpenQuickLook: () => void }> = ({
-  item,
-  onOpenQuickLook,
-}) => {
-  const [content, setContent] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    fetch(api.getRawFileUrl(item.root_name, item.path))
-      .then((res) => res.text())
-      .then((text) => {
-        if (!cancelled) {
-          const preview = text.split('\n').slice(0, 30).join('\n');
-          setContent(preview);
-          setLoading(false);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setContent(null);
-          setLoading(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [item.path, item.root_name]);
-
-  if (loading) {
-    return (
-      <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs gap-2">
-        <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent animate-spin rounded-full" />
-        <span>Loading preview...</span>
-      </div>
-    );
-  }
-
-  if (!content) {
-    return <FileIcon item={item} size={64} />;
-  }
-
-  return (
-    <div
-      onClick={onOpenQuickLook}
-      className="w-full h-full bg-gray-50 dark:bg-[#181818] p-2.5 overflow-hidden text-[10px] font-mono leading-relaxed text-gray-700 dark:text-gray-300 select-text cursor-pointer relative group"
-      title="Click to view full preview"
-    >
-      <pre className="overflow-hidden whitespace-pre-wrap break-all font-mono">
-        {content}
-      </pre>
-      <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-gray-50 dark:from-[#181818] to-transparent pointer-events-none flex items-end justify-center pb-0.5">
-        <span className="text-[9px] text-blue-600 dark:text-blue-400 font-sans font-medium bg-white/90 dark:bg-[#252526]/90 px-1.5 py-0.5 rounded shadow-xs opacity-0 group-hover:opacity-100 transition-opacity">
-          Click for Full Quick Look
-        </span>
-      </div>
-    </div>
-  );
-};
 
 export const MillerColumnsView: React.FC = () => {
   const {
@@ -87,6 +30,8 @@ export const MillerColumnsView: React.FC = () => {
   const [showAllSystemFolders, setShowAllSystemFolders] = useState(false);
 
   const { startDownload } = useDownloadStore();
+  const { getPreviewerForExt, getAvailableExtensionForExt, installExtension } = useExtensionStore();
+  const { openSettings } = useSettingsStore();
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -266,64 +211,33 @@ export const MillerColumnsView: React.FC = () => {
       ))}
 
       {/* Terminal Inspector Column when a File is Selected */}
-      {activeItem && !activeItem.is_dir && (
-        <div
-          onContextMenu={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            openContextMenu(e.clientX, e.clientY, activeItem);
-          }}
-          className="w-[85vw] min-w-[85vw] max-w-[85vw] md:w-80 md:min-w-[20rem] md:max-w-[20rem] snap-start border-r border-gray-200 dark:border-[#333333] flex flex-col h-full shrink-0 bg-gray-50/50 dark:bg-[#252526]/50 p-4 overflow-y-auto"
-        >
-          {/* Large Preview / Icon */}
+      {activeItem && !activeItem.is_dir && (() => {
+        const activeExt = (activeItem.extension || (activeItem.name ? activeItem.name.split('.').pop() : '') || '').toLowerCase();
+        const activeExtension = getPreviewerForExt(activeExt);
+        const availableExtension = !activeExtension ? getAvailableExtensionForExt(activeExt) : undefined;
+
+        return (
+          <div
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              openContextMenu(e.clientX, e.clientY, activeItem);
+            }}
+            className="w-[85vw] min-w-[85vw] max-w-[85vw] md:w-80 md:min-w-[20rem] md:max-w-[20rem] snap-start border-r border-gray-200 dark:border-[#333333] flex flex-col h-full shrink-0 bg-gray-50/50 dark:bg-[#252526]/50 p-4 overflow-y-auto"
+          >
           <div className="w-full h-44 bg-white dark:bg-[#1e1e1e] rounded-lg border border-gray-200 dark:border-[#3c3c3c] flex items-center justify-center overflow-hidden mb-4 shadow-sm">
-            {activeItem.media_type === 'image' ? (
-              <img
-                src={api.getRawFileUrl(activeItem.root_name, activeItem.path)}
-                alt={activeItem.name}
-                className="w-full h-full object-contain cursor-pointer"
-                onClick={() => setQuickLookOpen(true)}
-                title="Click to view full preview"
-              />
-            ) : activeItem.media_type === 'video' ? (
-              <div
-                onClick={() => playVideo(activeItem)}
-                className="relative w-full h-full flex items-center justify-center cursor-pointer group/vid"
-                title="Click to play in Video Player"
-              >
-                <video
-                  src={api.getRawFileUrl(activeItem.root_name, activeItem.path)}
-                  className="w-full h-full object-contain"
-                  controls={false}
-                />
-                <div className="absolute inset-0 bg-black/20 group-hover/vid:bg-black/40 flex items-center justify-center transition-colors">
-                  <div className="w-12 h-12 rounded-full bg-blue-600/90 group-hover/vid:bg-blue-600 text-white flex items-center justify-center shadow-lg transform group-hover/vid:scale-110 transition-transform">
-                    <Play size={20} className="translate-x-0.5" />
-                  </div>
-                </div>
-              </div>
-            ) : activeItem.media_type === 'audio' ? (
-              <div
-                onClick={() => playAudio(activeItem)}
-                className="relative w-full h-full flex items-center justify-center cursor-pointer group/aud"
-                title="Click to play in Music Player"
-              >
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-purple-600 to-pink-500 flex items-center justify-center text-white shadow-lg group-hover/aud:scale-105 transition-transform">
-                  <Music size={32} />
-                </div>
-              </div>
-            ) : activeItem.media_type === 'text' ||
-              activeItem.media_type === 'code' ||
-              ['txt', 'toml', 'yaml', 'yml', 'json', 'md', 'ini', 'env', 'conf', 'sql', 'sh', 'log', 'rs', 'ts', 'js', 'py', 'html', 'css', 'db', 'pub'].includes(
-                activeItem.extension?.toLowerCase() || ''
-              ) ? (
-              <InlineTextInspectorPreview
-                item={activeItem}
-                onOpenQuickLook={() => setQuickLookOpen(true)}
-              />
-            ) : (
-              <FileIcon item={activeItem} size={64} />
-            )}
+            <UniversalInspectorPreview
+              item={activeItem}
+              onOpenQuickLook={() => {
+                if (activeItem.media_type === 'audio') {
+                  playAudio(activeItem);
+                } else if (activeItem.media_type === 'video') {
+                  playVideo(activeItem);
+                } else {
+                  setQuickLookOpen(true);
+                }
+              }}
+            />
           </div>
 
           {/* File Name */}
@@ -336,7 +250,9 @@ export const MillerColumnsView: React.FC = () => {
             <div className="flex justify-between">
               <span>Kind</span>
               <span className="text-gray-900 dark:text-gray-200 capitalize">
-                {activeItem.media_type} ({activeItem.extension ? `.${activeItem.extension}` : 'File'})
+                {activeExtension
+                  ? `${activeExtension.name.split(' ')[0]} (.${activeExt.toUpperCase()})`
+                  : `${activeItem.media_type} (${activeItem.extension ? `.${activeItem.extension}` : 'File'})`}
               </span>
             </div>
 
@@ -360,13 +276,53 @@ export const MillerColumnsView: React.FC = () => {
 
           {/* Quick Action Buttons */}
           <div className="mt-6 space-y-2 border-t border-gray-200 dark:border-[#333333] pt-4">
-            <button
-              onClick={() => setQuickLookOpen(true)}
-              className="w-full flex items-center justify-center gap-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors"
-            >
-              <Eye size={14} />
-              <span>Quick Look (Space)</span>
-            </button>
+            {activeExtension ? (
+              <button
+                onClick={() => setQuickLookOpen(true)}
+                title={`Open in ${activeExtension.name} (Space)`}
+                className="w-full flex items-center justify-center gap-2 py-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-xl text-xs font-semibold shadow-md shadow-blue-500/25 transition-all active:scale-[0.98] group"
+              >
+                {activeExtension.icon === 'palette' ? (
+                  <Palette size={15} className="group-hover:rotate-12 transition-transform" />
+                ) : (
+                  <Box size={15} className="group-hover:rotate-12 transition-transform" />
+                )}
+                <span>Quick Look</span>
+                <span className="text-[10px] opacity-75 font-mono ml-0.5 font-normal">(Space)</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setQuickLookOpen(true)}
+                title="Quick Look (Space)"
+                className="w-full flex items-center justify-center gap-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors"
+              >
+                <Eye size={14} />
+                <span>Quick Look</span>
+                <span className="text-[10px] opacity-75 font-mono ml-0.5 font-normal">(Space)</span>
+              </button>
+            )}
+
+            {availableExtension && !activeExtension && (
+              availableExtension.isPaid && !availableExtension.isPurchased ? (
+                <button
+                  onClick={() => openSettings('extensions')}
+                  title={`Unlock ${availableExtension.name} in Extension Store`}
+                  className="w-full flex items-center justify-center gap-2 py-2 bg-gradient-to-r from-[#a50064] to-[#d82d8b] hover:from-[#8a0053] hover:to-[#be2077] text-white rounded-xl text-xs font-semibold transition-all shadow-xs active:scale-[0.98]"
+                >
+                  <Crown size={14} className="text-amber-300" />
+                  <span>Unlock in Extension Store</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => installExtension(availableExtension.id)}
+                  title={`Install ${availableExtension.name}`}
+                  className="w-full flex items-center justify-center gap-2 py-2 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/60 border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-300 rounded-xl text-xs font-semibold transition-all shadow-xs"
+                >
+                  <Blocks size={14} />
+                  <span>Install Extension</span>
+                </button>
+              )
+            )}
 
             {activeItem.media_type === 'audio' && (
               <button
@@ -374,7 +330,7 @@ export const MillerColumnsView: React.FC = () => {
                 className="w-full flex items-center justify-center gap-2 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-medium transition-colors shadow-sm"
               >
                 <Music size={14} />
-                <span>Play in Music Player</span>
+                <span>Play Audio</span>
               </button>
             )}
 
@@ -384,7 +340,7 @@ export const MillerColumnsView: React.FC = () => {
                 className="w-full flex items-center justify-center gap-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors shadow-sm"
               >
                 <Film size={14} />
-                <span>Play in Video Player</span>
+                <span>Play Video</span>
               </button>
             )}
 
@@ -415,7 +371,8 @@ export const MillerColumnsView: React.FC = () => {
             </button>
           </div>
         </div>
-      )}
+      );
+    })()}
     </div>
   );
 };

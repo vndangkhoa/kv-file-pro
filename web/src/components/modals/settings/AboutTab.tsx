@@ -6,7 +6,7 @@ export const AboutTab: React.FC = () => {
   const currentMode = getDataSourceMode();
 
   return (
-    <div className="space-y-6 max-w-2xl text-xs">
+    <div className="space-y-6 max-w-4xl mx-auto text-xs w-full">
       {/* Brand Hero */}
       <div className="flex items-center gap-3.5 p-4 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-900/40">
         <div className="p-3 bg-blue-600 text-white rounded-xl shadow-md">
@@ -16,7 +16,7 @@ export const AboutTab: React.FC = () => {
           <h3 className="font-bold text-base text-gray-900 dark:text-gray-100 flex items-center gap-2">
             <span>KV Files</span>
             <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-600 text-white">
-              v2.0.0
+              v2.1.0
             </span>
           </h3>
           <p className="text-gray-500 dark:text-gray-400 mt-0.5 text-[11px]">

@@ -50,7 +50,7 @@ export const StorageTab: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-2xl text-xs">
+    <div className="space-y-6 max-w-4xl mx-auto text-xs w-full">
       <div>
         <h3 className="font-semibold text-gray-800 dark:text-gray-200 text-sm mb-1">
           Storage Roots & Quotas

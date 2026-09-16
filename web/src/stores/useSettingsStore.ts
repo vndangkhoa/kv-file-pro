@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { ViewMode } from '../types';
 
-export type SettingsTab = 'account' | 'appearance' | 'explorer' | 'storage' | 'about';
+export type SettingsTab = 'account' | 'appearance' | 'explorer' | 'storage' | 'extensions' | 'about';
 
 export interface Preferences {
   theme: 'dark' | 'light' | 'system';

@@ -264,6 +264,13 @@ pub async fn stream_file(
         "pages" => "application/x-iwork-pages-sffpages".to_string(),
         "numbers" => "application/x-iwork-numbers-sffnumbers".to_string(),
         "keynote" | "key" => "application/x-iwork-keynote-sffkey".to_string(),
+        "woff2" => "font/woff2".to_string(),
+        "woff" => "font/woff".to_string(),
+        "ttf" => "font/ttf".to_string(),
+        "otf" => "font/otf".to_string(),
+        "eot" => "application/vnd.ms-fontobject".to_string(),
+        "epub" => "application/epub+zip".to_string(),
+        "svg" | "svgz" => "image/svg+xml".to_string(),
         _ => mime_guess::from_path(&abs_path)
             .first_or_octet_stream()
             .to_string(),
