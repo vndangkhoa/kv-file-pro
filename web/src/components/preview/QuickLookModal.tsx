@@ -666,10 +666,10 @@ export const QuickLookModal: React.FC = () => {
                       setQuickLookOpen(false);
                       openSettings('extensions');
                     }}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-amber-500/20 transition-all active:scale-95"
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-blue-600/20 transition-all active:scale-95 cursor-pointer"
                   >
                     <Crown size={15} className="text-amber-200" />
-                    <span>Unlock with KV File PRO ({availableExtension.price ? `${availableExtension.price.toLocaleString('vi-VN')} ₫` : 'Pro'})</span>
+                    <span>Unlock with KV File PRO (199.000 ₫)</span>
                   </button>
                 ) : (
                   <button

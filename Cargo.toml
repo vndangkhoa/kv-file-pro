@@ -35,6 +35,7 @@ zip = { version = "2.2", default-features = false, features = ["deflate"] }
 
 # CLI & Configuration
 clap = { version = "4.5", features = ["derive", "env"] }
+dotenvy = "0.15"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
@@ -42,7 +43,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rust-embed = { version = "8.5", features = ["mime-guess"] }
 totp-rs = { version = "6.0.0", features = ["qr", "gen_secret"] }
 
-# Payments & HTTP Client (MoMo API v2)
+# Payments & HTTP Client (ZaloPay API v2)
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 hmac = "0.12"
 sha2 = "0.10"

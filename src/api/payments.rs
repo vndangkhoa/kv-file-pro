@@ -2,16 +2,17 @@ use crate::error::{AppError, Result};
 use crate::models::{
     ActivateLicenseRequest, ActivateLicenseResponse, AdminOrderActionRequest,
     AdminOrdersListResponse, AdminOrdersQuery, CreatePaymentRequest, CreatePaymentResponse,
-    ExtensionLicense, ExtensionOrder, FsEvent, MoMoCreateRequest, MoMoCreateResponse,
-    MoMoIpnPayload, OrderStatusResponse, SubmitTransferRequest, User,
+    ExtensionLicense, ExtensionOrder, FsEvent, OrderStatusResponse, SubmitTransferRequest, User,
+    ZaloPayCallbackData, ZaloPayCallbackRequest, ZaloPayCallbackResponse,
+    ZaloPayCreateOrderRequest, ZaloPayCreateOrderResponse, ZaloPayQueryOrderRequest,
+    ZaloPayQueryOrderResponse,
 };
 use crate::state::AppState;
 use axum::{
     extract::{Extension, Path, Query, State},
-    http::StatusCode,
-    response::IntoResponse,
     Json,
 };
+use chrono::FixedOffset;
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
 use uuid::Uuid;
@@ -20,24 +21,194 @@ type HmacSha256 = Hmac<Sha256>;
 
 pub const DEFAULT_LICENSE_SECRET: &str = "KV_FILES_PRO_MASTER_SIGNING_KEY_v2";
 
-/// Constant-time string equality check to prevent timing attacks
+// -----------------------------------------------------------------------------
+// ZaloPay Official Default Sandbox Credentials (https://sbmc.zalopay.vn)
+// -----------------------------------------------------------------------------
+pub const SANDBOX_ZALOPAY_APP_ID: u32 = 2554;
+pub const SANDBOX_ZALOPAY_KEY1: &str = "sdngKKJmqEMzvh5QQcdD2A9XBSKUNaYn";
+pub const SANDBOX_ZALOPAY_KEY2: &str = "trMrHtvjo6myautxDUiAcYsVtaeQ8nhf";
+pub const SANDBOX_ZALOPAY_CREATE_ENDPOINT: &str = "https://sb-openapi.zalopay.vn/v2/create";
+pub const SANDBOX_ZALOPAY_QUERY_ENDPOINT: &str = "https://sb-openapi.zalopay.vn/v2/query";
+
+pub const PROD_ZALOPAY_CREATE_ENDPOINT: &str = "https://openapi.zalopay.vn/v2/create";
+pub const PROD_ZALOPAY_QUERY_ENDPOINT: &str = "https://openapi.zalopay.vn/v2/query";
+
+pub const DEFAULT_ZALOPAY_REDIRECT_URL: &str = "http://localhost:8866/settings?tab=extensions";
+pub const DEFAULT_ZALOPAY_CALLBACK_URL: &str = "http://localhost:8866/api/v1/payments/zalopay/callback";
+
+// -----------------------------------------------------------------------------
+// ZaloPay Approved Production Merchant & VietQR Credentials
+// Store ID: 835219_835220_835221
+// -----------------------------------------------------------------------------
+pub const DEFAULT_ZALOPAY_STORE_ID: &str = "835219_835220_835221";
+pub const DEFAULT_ZALOPAY_MERCHANT_CODE: &str = "ZP-9B856443";
+pub const DEFAULT_ZALOPAY_MERCHANT_NAME: &str = "KV FILE PRO (Thu Ngân)";
+pub const DEFAULT_ZALOPAY_BANK_NAME: &str = "BVBank (Ngân hàng Bản Việt)";
+pub const DEFAULT_ZALOPAY_BANK_BIN: &str = "970454";
+pub const DEFAULT_ZALOPAY_ACCOUNT_NO: &str = "99ZP26264M777568";
+pub const DEFAULT_ZALOPAY_PRO_QR: &str = "/zalopay_pro_qr.png";
+
+#[derive(Debug, Clone)]
+pub struct ZaloPayConfig {
+    pub app_id: u32,
+    pub key1: String,
+    pub key2: String,
+    pub create_endpoint: String,
+    pub query_endpoint: String,
+    pub redirect_url: String,
+    pub callback_url: String,
+    pub is_sandbox: bool,
+    pub store_id: String,
+    pub merchant_code: String,
+    pub merchant_name: String,
+    pub bank_name: String,
+    pub bank_bin: String,
+    pub account_no: String,
+    pub qr_image_url: String,
+}
+
+pub fn get_zalopay_config() -> ZaloPayConfig {
+    get_zalopay_config_with_override(None)
+}
+
+pub fn get_zalopay_config_with_override(force_test: Option<bool>) -> ZaloPayConfig {
+    let env_mode = std::env::var("ZALOPAY_ENV").unwrap_or_else(|_| "sandbox".into());
+
+    let is_sandbox = force_test.unwrap_or_else(|| {
+        env_mode.eq_ignore_ascii_case("sandbox")
+            || env_mode.eq_ignore_ascii_case("test")
+            || env_mode.eq_ignore_ascii_case("dev")
+    });
+
+    let app_id: u32 = std::env::var("ZALOPAY_APP_ID")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(SANDBOX_ZALOPAY_APP_ID);
+
+    let key1 = std::env::var("ZALOPAY_KEY1").unwrap_or_else(|_| SANDBOX_ZALOPAY_KEY1.into());
+    let key2 = std::env::var("ZALOPAY_KEY2").unwrap_or_else(|_| SANDBOX_ZALOPAY_KEY2.into());
+
+    let create_endpoint = std::env::var("ZALOPAY_CREATE_ENDPOINT").unwrap_or_else(|_| {
+        if is_sandbox {
+            SANDBOX_ZALOPAY_CREATE_ENDPOINT.into()
+        } else {
+            PROD_ZALOPAY_CREATE_ENDPOINT.into()
+        }
+    });
+
+    let query_endpoint = std::env::var("ZALOPAY_QUERY_ENDPOINT").unwrap_or_else(|_| {
+        if is_sandbox {
+            SANDBOX_ZALOPAY_QUERY_ENDPOINT.into()
+        } else {
+            PROD_ZALOPAY_QUERY_ENDPOINT.into()
+        }
+    });
+
+    let redirect_url = std::env::var("ZALOPAY_REDIRECT_URL")
+        .unwrap_or_else(|_| DEFAULT_ZALOPAY_REDIRECT_URL.into());
+    let callback_url = std::env::var("ZALOPAY_CALLBACK_URL")
+        .unwrap_or_else(|_| DEFAULT_ZALOPAY_CALLBACK_URL.into());
+
+    let store_id = std::env::var("ZALOPAY_STORE_ID")
+        .unwrap_or_else(|_| DEFAULT_ZALOPAY_STORE_ID.into());
+    let merchant_code = std::env::var("ZALOPAY_MERCHANT_CODE")
+        .unwrap_or_else(|_| DEFAULT_ZALOPAY_MERCHANT_CODE.into());
+    let merchant_name = std::env::var("ZALOPAY_MERCHANT_NAME")
+        .unwrap_or_else(|_| DEFAULT_ZALOPAY_MERCHANT_NAME.into());
+    let bank_name = std::env::var("ZALOPAY_BANK_NAME")
+        .unwrap_or_else(|_| DEFAULT_ZALOPAY_BANK_NAME.into());
+    let bank_bin = std::env::var("ZALOPAY_BANK_BIN")
+        .unwrap_or_else(|_| DEFAULT_ZALOPAY_BANK_BIN.into());
+    let account_no = std::env::var("ZALOPAY_ACCOUNT_NO")
+        .unwrap_or_else(|_| DEFAULT_ZALOPAY_ACCOUNT_NO.into());
+    let qr_image_url = std::env::var("ZALOPAY_QR_IMAGE")
+        .unwrap_or_else(|_| DEFAULT_ZALOPAY_PRO_QR.into());
+
+    ZaloPayConfig {
+        app_id,
+        key1,
+        key2,
+        create_endpoint,
+        query_endpoint,
+        redirect_url,
+        callback_url,
+        is_sandbox,
+        store_id,
+        merchant_code,
+        merchant_name,
+        bank_name,
+        bank_bin,
+        account_no,
+        qr_image_url,
+    }
+}
+
+/// Generate app_trans_id compliant with ZaloPay v2: format `yymmdd_xxxx` (GMT+7)
+pub fn generate_zalopay_trans_id(suffix: &str) -> String {
+    let vn_tz = FixedOffset::east_opt(7 * 3600).unwrap_or(FixedOffset::east_opt(0).unwrap());
+    let now_vn = chrono::Utc::now().with_timezone(&vn_tz);
+    let date_prefix = now_vn.format("%y%m%d").to_string();
+    let clean: String = suffix
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '_')
+        .take(28)
+        .collect();
+    format!("{}_{}", date_prefix, clean)
+}
+
+/// Sign ZaloPay Order creation MAC with Key1
+/// Formula: HMAC_SHA256(key1, app_id|app_trans_id|app_user|amount|app_time|embed_data|item)
+pub fn sign_zalopay_order_mac(
+    app_id: u32,
+    app_trans_id: &str,
+    app_user: &str,
+    amount: i64,
+    app_time: i64,
+    embed_data: &str,
+    item: &str,
+    key1: &str,
+) -> String {
+    let raw = format!(
+        "{}|{}|{}|{}|{}|{}|{}",
+        app_id, app_trans_id, app_user, amount, app_time, embed_data, item
+    );
+    let mut mac = HmacSha256::new_from_slice(key1.as_bytes())
+        .expect("HMAC can take key of any size");
+    mac.update(raw.as_bytes());
+    hex::encode(mac.finalize().into_bytes())
+}
+
+/// Sign / Verify ZaloPay Callback MAC with Key2
+/// Formula: HMAC_SHA256(key2, data)
+pub fn sign_zalopay_callback_mac(data: &str, key2: &str) -> String {
+    let mut mac = HmacSha256::new_from_slice(key2.as_bytes())
+        .expect("HMAC can take key of any size");
+    mac.update(data.as_bytes());
+    hex::encode(mac.finalize().into_bytes())
+}
+
+/// Sign ZaloPay Query Order MAC with Key1
+/// Formula: HMAC_SHA256(key1, app_id|app_trans_id|key1)
+pub fn sign_zalopay_query_mac(app_id: u32, app_trans_id: &str, key1: &str) -> String {
+    let raw = format!("{}|{}|{}", app_id, app_trans_id, key1);
+    let mut mac = HmacSha256::new_from_slice(key1.as_bytes())
+        .expect("HMAC can take key of any size");
+    mac.update(raw.as_bytes());
+    hex::encode(mac.finalize().into_bytes())
+}
+
+/// Constant-time string equality to prevent timing attacks on HMAC signatures
 pub fn subtle_string_eq(a: &str, b: &str) -> bool {
-    if a.len() != b.len() {
+    let a_bytes = a.as_bytes();
+    let b_bytes = b.as_bytes();
+    if a_bytes.len() != b_bytes.len() {
         return false;
     }
     let mut result = 0u8;
-    for (x, y) in a.bytes().zip(b.bytes()) {
+    for (x, y) in a_bytes.iter().zip(b_bytes.iter()) {
         result |= x ^ y;
     }
     result == 0
-}
-
-/// Sign MoMo payload for gateway API v2
-pub fn sign_momo_payload(raw_data: &str, secret_key: &str) -> String {
-    let mut mac = HmacSha256::new_from_slice(secret_key.as_bytes())
-        .expect("HMAC can take key of any size");
-    mac.update(raw_data.as_bytes());
-    hex::encode(mac.finalize().into_bytes())
 }
 
 /// Generate a cryptographically signed license key
@@ -137,8 +308,12 @@ pub fn get_extension_price(ext_id: &str) -> i64 {
     }
 }
 
-/// Create a MoMo v2 All-In-One payment session
-pub async fn create_momo_payment(
+// -----------------------------------------------------------------------------
+// ZaloPay v2 API Handlers
+// -----------------------------------------------------------------------------
+
+/// Create a ZaloPay v2 payment session (/v2/create)
+pub async fn create_zalopay_payment(
     State(state): State<AppState>,
     Extension(user): Extension<User>,
     Json(req): Json<CreatePaymentRequest>,
@@ -156,120 +331,206 @@ pub async fn create_momo_payment(
 
     let amount = get_extension_price(extension_id);
     let order_id = format!("KV-ORD-{}", Uuid::new_v4());
-    let request_id = format!("REQ-{}", Uuid::new_v4());
-    let order_info = if extension_id == crate::models::PRO_BUNDLE_ID {
+    let short_uuid = Uuid::new_v4().simple().to_string()[..12].to_string();
+    let app_trans_id = generate_zalopay_trans_id(&short_uuid);
+    let app_time = chrono::Utc::now().timestamp_millis();
+
+    let cfg = get_zalopay_config_with_override(req.test_mode);
+
+    let embed_data = serde_json::json!({
+        "redirecturl": cfg.redirect_url,
+        "order_id": order_id,
+        "extension_id": extension_id,
+    })
+    .to_string();
+
+    let item_name = if extension_id == crate::models::PRO_BUNDLE_ID {
         "KV Files: Lifetime Pro Pass (All Extensions)".to_string()
     } else {
         format!("KV Files Store: License for {}", extension_id)
     };
-    let extra_data = "";
-    let request_type = "captureWallet";
 
-    let partner_code = std::env::var("MOMO_PARTNER_CODE").unwrap_or_else(|_| "MOMO".into());
-    let access_key = std::env::var("MOMO_ACCESS_KEY").unwrap_or_else(|_| "F8BBA842ECF85".into());
-    let secret_key = std::env::var("MOMO_SECRET_KEY")
-        .unwrap_or_else(|_| "K951B6PE1waDMi640xX08PD3vg6EkVlz".into());
-    let momo_endpoint = std::env::var("MOMO_ENDPOINT")
-        .unwrap_or_else(|_| "https://test-payment.momo.vn/v2/gateway/api/create".into());
-    let redirect_url = std::env::var("MOMO_REDIRECT_URL")
-        .unwrap_or_else(|_| "http://localhost:8866/settings?tab=extensions".into());
-    let ipn_url = std::env::var("MOMO_IPN_URL")
-        .unwrap_or_else(|_| "http://localhost:8866/api/v1/payments/momo/ipn".into());
+    let item = serde_json::json!([{
+        "itemid": extension_id,
+        "itemname": item_name,
+        "itemprice": amount,
+        "itemquantity": 1,
+    }])
+    .to_string();
 
-    // 1. Build signature: raw alphabet order as required by MoMo API v2
-    let raw_signature = format!(
-        "accessKey={}&amount={}&extraData={}&ipnUrl={}&orderId={}&orderInfo={}&partnerCode={}&redirectUrl={}&requestId={}&requestType={}",
-        access_key, amount, extra_data, ipn_url, order_id, order_info, partner_code, redirect_url, request_id, request_type
+    let description = format!("KV Files - Order {}", app_trans_id);
+
+    // 1. Build signature MAC with Key1
+    let mac = sign_zalopay_order_mac(
+        cfg.app_id,
+        &app_trans_id,
+        &user.username,
+        amount,
+        app_time,
+        &embed_data,
+        &item,
+        &cfg.key1,
     );
-    let signature = sign_momo_payload(&raw_signature, &secret_key);
 
     // 2. Persist initial order in SQLite
     let now = chrono::Utc::now().to_rfc3339();
+    let payment_method = if cfg.is_sandbox {
+        "ZALOPAY_SANDBOX"
+    } else {
+        "ZALOPAY_PRODUCTION"
+    };
+
     let order = ExtensionOrder {
         id: order_id.clone(),
         user_id: user.id.clone(),
         extension_id: extension_id.to_string(),
         amount,
         status: "PENDING".into(),
-        momo_trans_id: None,
+        gateway_trans_id: Some(app_trans_id.clone()),
         user_note: None,
-        payment_method: Some("MOMO_GATEWAY".into()),
+        payment_method: Some(payment_method.into()),
         created_at: now.clone(),
         updated_at: now,
     };
     state.db.create_extension_order(&order).await?;
 
-    // 3. Dispatch to official MoMo Gateway API
+    // 3. Dispatch to official ZaloPay Gateway API (/v2/create) if configured
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(12))
         .build()
         .map_err(|e| AppError::Internal(format!("Failed to build HTTP client: {}", e)))?;
 
-    let momo_req = MoMoCreateRequest {
-        partnerCode: partner_code.clone(),
-        partnerName: "KV Files Extension Store".into(),
-        storeId: "KVFilesStore".into(),
-        requestId: request_id.clone(),
+    let zp_req = ZaloPayCreateOrderRequest {
+        app_id: cfg.app_id,
+        app_user: user.username.clone(),
+        app_time,
         amount,
-        orderId: order_id.clone(),
-        orderInfo: order_info,
-        redirectUrl: redirect_url,
-        ipnUrl: ipn_url,
-        lang: "vi".into(),
-        extraData: extra_data.into(),
-        requestType: request_type.into(),
-        signature,
+        app_trans_id: app_trans_id.clone(),
+        embed_data,
+        item,
+        description,
+        bank_code: "".into(),
+        callback_url: cfg.callback_url.clone(),
+        mac,
     };
 
-    let momo_res = client.post(&momo_endpoint).json(&momo_req).send().await;
+    let zp_res = client.post(&cfg.create_endpoint).form(&zp_req).send().await;
 
-    if let Ok(resp) = momo_res {
-        if resp.status().is_success() {
-            if let Ok(data) = resp.json::<MoMoCreateResponse>().await {
-                if data.resultCode == Some(0) {
-                    let pay_url = data.payUrl.unwrap_or_default();
-                    let raw_qr = data.qrCodeUrl.as_deref().unwrap_or(&pay_url);
-                    let qr_code_url = reqwest::Url::parse_with_params(
-                        "https://api.qrserver.com/v1/create-qr-code/",
-                        &[("size", "300x300"), ("data", raw_qr)],
-                    )
-                    .map(|u| u.to_string())
-                    .ok();
+    match zp_res {
+        Ok(resp) => {
+            let status = resp.status();
+            if status.is_success() {
+                if let Ok(data) = resp.json::<ZaloPayCreateOrderResponse>().await {
+                    if data.return_code == 1 {
+                        let pay_url = data.order_url.unwrap_or_default();
+                        let qr_code_url = if !cfg.is_sandbox && !cfg.qr_image_url.is_empty() {
+                            Some(cfg.qr_image_url.clone())
+                        } else if let Some(ref q) = data.qr_code {
+                            if q.starts_with("http") || q.starts_with("data:") {
+                                Some(q.clone())
+                            } else {
+                                reqwest::Url::parse_with_params(
+                                    "https://api.qrserver.com/v1/create-qr-code/",
+                                    &[("size", "300x300"), ("data", q)],
+                                )
+                                .map(|u| u.to_string())
+                                .ok()
+                                .or_else(|| Some(cfg.qr_image_url.clone()))
+                            }
+                        } else if !pay_url.is_empty() {
+                            reqwest::Url::parse_with_params(
+                                "https://api.qrserver.com/v1/create-qr-code/",
+                                &[("size", "300x300"), ("data", &pay_url)],
+                            )
+                            .map(|u| u.to_string())
+                            .ok()
+                            .or_else(|| Some(cfg.qr_image_url.clone()))
+                        } else {
+                            Some(cfg.qr_image_url.clone())
+                        };
 
-                    return Ok(Json(CreatePaymentResponse {
-                        order_id,
-                        extension_id: extension_id.to_string(),
-                        amount,
-                        pay_url,
-                        qr_code_url,
-                        deeplink: data.deeplink,
-                        status: "PENDING".into(),
-                        is_mock: false,
-                        phone_number: None,
-                        receiver_name: None,
-                    }));
-                } else {
-                    tracing::warn!(
-                        "MoMo Gateway returned resultCode {:?}: {:?}",
-                        data.resultCode,
-                        data.message
-                    );
+                        return Ok(Json(CreatePaymentResponse {
+                            order_id: order_id.clone(),
+                            app_trans_id,
+                            extension_id: extension_id.to_string(),
+                            amount,
+                            pay_url,
+                            qr_code_url,
+                            deeplink: None,
+                            status: "PENDING".into(),
+                            is_mock: false,
+                            is_test_mode: cfg.is_sandbox,
+                            bank_name: Some(cfg.bank_name.clone()),
+                            bank_account: Some(cfg.account_no.clone()),
+                            account_name: Some(cfg.merchant_name.clone()),
+                            merchant_code: Some(cfg.merchant_code.clone()),
+                            store_id: Some(cfg.store_id.clone()),
+                            transfer_content: Some(format!("KV FILE PRO {}", &order_id[order_id.len().saturating_sub(8)..])),
+                        }));
+                    } else {
+                        let err_msg = format!(
+                            "ZaloPay (return_code {}): {}",
+                            data.return_code, data.return_message
+                        );
+                        tracing::warn!("ZaloPay Create Order response: {}", err_msg);
+                    }
                 }
             }
         }
+        Err(e) => {
+            tracing::warn!("Network error dispatching to ZaloPay Gateway: {}", e);
+        }
     }
 
-    // Gateway fallback (e.g. offline dev environment)
-    let fallback_pay_url = "https://test-payment.momo.vn".to_string();
+    // In production mode with ZaloPay POS Merchant VietQR:
+    if !cfg.is_sandbox {
+        let qr_code_url = if amount == crate::models::PRO_BUNDLE_PRICE {
+            cfg.qr_image_url.clone()
+        } else {
+            reqwest::Url::parse_with_params(
+                &format!("https://img.vietqr.io/image/{}-{}-compact2.png", cfg.bank_bin, cfg.account_no),
+                &[
+                    ("amount", &amount.to_string()),
+                    ("addInfo", &format!("KV FILE PRO {}", &order_id[order_id.len().saturating_sub(8)..])),
+                    ("accountName", &cfg.merchant_name),
+                ],
+            )
+            .map(|u| u.to_string())
+            .unwrap_or_else(|_| cfg.qr_image_url.clone())
+        };
+
+        return Ok(Json(CreatePaymentResponse {
+            order_id: order_id.clone(),
+            app_trans_id,
+            extension_id: extension_id.to_string(),
+            amount,
+            pay_url: qr_code_url.clone(),
+            qr_code_url: Some(qr_code_url),
+            deeplink: None,
+            status: "PENDING".into(),
+            is_mock: false,
+            is_test_mode: false,
+            bank_name: Some(cfg.bank_name.clone()),
+            bank_account: Some(cfg.account_no.clone()),
+            account_name: Some(cfg.merchant_name.clone()),
+            merchant_code: Some(cfg.merchant_code.clone()),
+            store_id: Some(cfg.store_id.clone()),
+            transfer_content: Some(format!("KV FILE PRO {}", &order_id[order_id.len().saturating_sub(8)..])),
+        }));
+    }
+
+    // Fallback sandbox test session if remote sandbox unreachable
+    let fallback_pay_url = format!("https://sb-openapi.zalopay.vn/v2/pay?app_trans_id={}", app_trans_id);
     let qr_code_url = reqwest::Url::parse_with_params(
         "https://api.qrserver.com/v1/create-qr-code/",
-        &[("size", "300x300"), ("data", &format!("https://test-payment.momo.vn/v2/gateway/pay?orderId={}", order_id))],
+        &[("size", "300x300"), ("data", &fallback_pay_url)],
     )
     .map(|u| u.to_string())
     .ok();
 
     Ok(Json(CreatePaymentResponse {
-        order_id,
+        order_id: order_id.clone(),
+        app_trans_id,
         extension_id: extension_id.to_string(),
         amount,
         pay_url: fallback_pay_url,
@@ -277,119 +538,143 @@ pub async fn create_momo_payment(
         deeplink: None,
         status: "PENDING".into(),
         is_mock: true,
-        phone_number: None,
-        receiver_name: None,
+        is_test_mode: cfg.is_sandbox,
+        bank_name: Some(cfg.bank_name),
+        bank_account: Some(cfg.account_no),
+        account_name: Some(cfg.merchant_name),
+        merchant_code: Some(cfg.merchant_code),
+        store_id: Some(cfg.store_id),
+        transfer_content: Some(format!("KV FILE PRO {}", &order_id[order_id.len().saturating_sub(8)..])),
     }))
 }
 
-/// Instant Payment Notification (IPN) server-to-server callback from MoMo
-pub async fn momo_ipn_webhook(
+/// ZaloPay Server-to-Server Callback Webhook
+/// Receives POST JSON: { "data": "...", "mac": "...", "type": 1 }
+/// Authenticated via HMAC-SHA256(key2, data)
+pub async fn zalopay_callback_webhook(
     State(state): State<AppState>,
-    Json(payload): Json<MoMoIpnPayload>,
-) -> impl IntoResponse {
-    let access_key = std::env::var("MOMO_ACCESS_KEY").unwrap_or_else(|_| "F8BBA842ECF85".into());
-    let secret_key = std::env::var("MOMO_SECRET_KEY")
-        .unwrap_or_else(|_| "K951B6PE1waDMi640xX08PD3vg6EkVlz".into());
+    Json(payload): Json<ZaloPayCallbackRequest>,
+) -> Json<ZaloPayCallbackResponse> {
+    let cfg = get_zalopay_config();
 
-    // 1. Verify incoming signature with timing-attack resistant comparison
-    let raw_signature = format!(
-        "accessKey={}&amount={}&extraData={}&message={}&orderId={}&orderInfo={}&orderType={}&partnerCode={}&payType={}&requestId={}&responseTime={}&resultCode={}&transId={}",
-        access_key, payload.amount, payload.extraData, payload.message, payload.orderId,
-        payload.orderInfo, payload.orderType, payload.partnerCode, payload.payType,
-        payload.requestId, payload.responseTime, payload.resultCode, payload.transId
-    );
-    let expected_sig = sign_momo_payload(&raw_signature, &secret_key);
-
-    if !subtle_string_eq(&expected_sig, &payload.signature) {
+    // 1. Verify incoming MAC using Key2
+    let expected_mac = sign_zalopay_callback_mac(&payload.data, &cfg.key2);
+    if !subtle_string_eq(&expected_mac, &payload.mac) {
         tracing::warn!(
-            "MoMo IPN signature mismatch for order: {}, incoming: {}, expected: {}",
-            payload.orderId,
-            payload.signature,
-            expected_sig
+            "ZaloPay callback MAC verification failed! Incoming: {}, Expected: {}",
+            payload.mac,
+            expected_mac
         );
-        return (StatusCode::BAD_REQUEST, "Signature verification failed").into_response();
+        return Json(ZaloPayCallbackResponse {
+            return_code: -1,
+            return_message: "mac not equal".into(),
+        });
     }
 
-    // 2. Look up the order in SQLite
-    let order_opt = match state.db.get_extension_order(&payload.orderId).await {
+    // 2. Parse callback data JSON string
+    let data: ZaloPayCallbackData = match serde_json::from_str(&payload.data) {
+        Ok(d) => d,
+        Err(e) => {
+            tracing::error!("Failed to parse ZaloPay callback data JSON: {}", e);
+            return Json(ZaloPayCallbackResponse {
+                return_code: 0,
+                return_message: format!("json parse error: {}", e),
+            });
+        }
+    };
+
+    // 3. Find the pending order by app_trans_id
+    let order_opt = match state.db.get_extension_order(&data.app_trans_id).await {
         Ok(opt) => opt,
         Err(e) => {
-            tracing::error!("DB error retrieving order {}: {}", payload.orderId, e);
-            return (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response();
+            tracing::error!("DB error looking up order by trans_id {}: {}", data.app_trans_id, e);
+            return Json(ZaloPayCallbackResponse {
+                return_code: 0,
+                return_message: "database error".into(),
+            });
         }
     };
 
     let order = match order_opt {
         Some(o) => o,
         None => {
-            tracing::warn!("MoMo IPN order not found: {}", payload.orderId);
-            return (StatusCode::NOT_FOUND, "Order not found").into_response();
+            tracing::warn!("ZaloPay callback: order not found for trans_id {}", data.app_trans_id);
+            return Json(ZaloPayCallbackResponse {
+                return_code: 0,
+                return_message: "order not found".into(),
+            });
         }
     };
 
-    // 3. Verify amount strictly to prevent tampering
-    if payload.amount != order.amount {
+    // 4. Verify amount strictly
+    if data.amount != order.amount {
         tracing::warn!(
-            "MoMo IPN amount mismatch for order {}: received {}, expected {}",
-            order.id, payload.amount, order.amount
+            "ZaloPay callback amount mismatch for order {}: received {}, expected {}",
+            order.id, data.amount, order.amount
         );
-        return (StatusCode::BAD_REQUEST, "Amount mismatch").into_response();
+        return Json(ZaloPayCallbackResponse {
+            return_code: 0,
+            return_message: "amount mismatch".into(),
+        });
     }
 
-    // 4. Idempotency guard: if already PAID, return 204 immediately
+    // 5. Idempotency guard: if already PAID, return success immediately
     if order.status == "PAID" {
-        return StatusCode::NO_CONTENT.into_response();
+        return Json(ZaloPayCallbackResponse {
+            return_code: 1,
+            return_message: "success".into(),
+        });
     }
 
-    if payload.resultCode == 0 {
-        // Payment successful
-        let trans_id_str = payload.transId.to_string();
-        let _ = state
-            .db
-            .update_order_status(&order.id, "PAID", Some(&trans_id_str))
-            .await;
+    // 6. Mark order as PAID and issue cryptographic license
+    let zp_trans_id_str = data
+        .zp_trans_id
+        .map(|t| t.to_string())
+        .unwrap_or_else(|| data.app_trans_id.clone());
 
-        let signing_secret = state
-            .db
-            .get_or_create_license_signing_secret()
-            .await
-            .unwrap_or_else(|_| secret_key.clone());
-        let license_key = generate_signed_license_key(&order.extension_id, &signing_secret);
+    let _ = state
+        .db
+        .update_order_status(&order.id, "PAID", Some(&zp_trans_id_str))
+        .await;
 
-        let license = ExtensionLicense {
-            id: format!("LIC-{}", Uuid::new_v4()),
-            user_id: order.user_id.clone(),
-            extension_id: order.extension_id.clone(),
-            order_id: order.id.clone(),
-            license_key,
-            purchased_at: chrono::Utc::now().to_rfc3339(),
-        };
+    let signing_secret = state
+        .db
+        .get_or_create_license_signing_secret()
+        .await
+        .unwrap_or_else(|_| cfg.key1.clone());
+    let license_key = generate_signed_license_key(&order.extension_id, &signing_secret);
 
-        if let Err(e) = state.db.grant_extension_license(&license).await {
-            tracing::error!("Failed to grant license for order {}: {}", order.id, e);
-        } else {
-            tracing::info!(
-                "License granted for extension '{}' to user '{}'",
-                order.extension_id,
-                order.user_id
-            );
-            // Broadcast event via WebSocket to instantly update client
-            let _ = state.tx.send(FsEvent {
-                event_type: "extension_licensed".into(),
-                root_name: order.extension_id.clone(),
-                path: order.user_id.clone(),
-                is_dir: false,
-            });
-        }
+    let license = ExtensionLicense {
+        id: format!("LIC-{}", Uuid::new_v4()),
+        user_id: order.user_id.clone(),
+        extension_id: order.extension_id.clone(),
+        order_id: order.id.clone(),
+        license_key,
+        purchased_at: chrono::Utc::now().to_rfc3339(),
+    };
+
+    if let Err(e) = state.db.grant_extension_license(&license).await {
+        tracing::error!("Failed to grant license for ZaloPay order {}: {}", order.id, e);
     } else {
-        let _ = state
-            .db
-            .update_order_status(&order.id, "FAILED", Some(&payload.transId.to_string()))
-            .await;
+        tracing::info!(
+            "ZaloPay License granted for extension '{}' to user '{}' (ZP Trans: {})",
+            order.extension_id,
+            order.user_id,
+            zp_trans_id_str
+        );
+        // Real-time broadcast to all connected WebSocket clients
+        let _ = state.tx.send(FsEvent {
+            event_type: "extension_licensed".into(),
+            root_name: order.extension_id.clone(),
+            path: order.user_id.clone(),
+            is_dir: false,
+        });
     }
 
-    // MoMo spec requires HTTP 204 No Content response
-    StatusCode::NO_CONTENT.into_response()
+    Json(ZaloPayCallbackResponse {
+        return_code: 1,
+        return_message: "success".into(),
+    })
 }
 
 /// Retrieve all purchased extension licenses for the current authenticated user
@@ -401,13 +686,37 @@ pub async fn get_user_licenses(
     Ok(Json(licenses))
 }
 
-/// Poll status of a specific order
+/// Query transaction status from ZaloPay v2 (/v2/query)
+pub async fn query_zalopay_order_status(app_trans_id: &str) -> Option<ZaloPayQueryOrderResponse> {
+    let cfg = get_zalopay_config();
+    let mac = sign_zalopay_query_mac(cfg.app_id, app_trans_id, &cfg.key1);
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(8))
+        .build()
+        .ok()?;
+
+    let query_req = ZaloPayQueryOrderRequest {
+        app_id: cfg.app_id,
+        app_trans_id: app_trans_id.to_string(),
+        mac,
+    };
+
+    let resp = client.post(&cfg.query_endpoint).form(&query_req).send().await.ok()?;
+    if resp.status().is_success() {
+        resp.json::<ZaloPayQueryOrderResponse>().await.ok()
+    } else {
+        None
+    }
+}
+
+/// Poll status of a specific order with automatic ZaloPay Gateway real-time query
 pub async fn check_order_status(
     State(state): State<AppState>,
     Extension(user): Extension<User>,
     Path(order_id): Path<String>,
 ) -> Result<Json<OrderStatusResponse>> {
-    let order = state
+    let mut order = state
         .db
         .get_extension_order(&order_id)
         .await?
@@ -415,6 +724,68 @@ pub async fn check_order_status(
 
     if order.user_id != user.id && user.role != "admin" {
         return Err(AppError::Forbidden("You do not have permission to view this order".into()));
+    }
+
+    // If order is PENDING, query ZaloPay in real-time to check if payment was completed
+    if order.status == "PENDING" {
+        if let Some(trans_id) = order.gateway_trans_id.as_deref() {
+            if let Some(query_resp) = query_zalopay_order_status(trans_id).await {
+                if query_resp.return_code == 1 {
+                    // ZaloPay confirmed successful payment!
+                    let zp_trans_str = query_resp
+                        .zp_trans_id
+                        .map(|t| t.to_string())
+                        .unwrap_or_else(|| format!("ZP-VERIFIED-{}", chrono::Utc::now().timestamp_millis()));
+
+                    let _ = state
+                        .db
+                        .update_order_status(&order.id, "PAID", Some(&zp_trans_str))
+                        .await;
+
+                    let signing_secret = state
+                        .db
+                        .get_or_create_license_signing_secret()
+                        .await
+                        .unwrap_or_else(|_| DEFAULT_LICENSE_SECRET.to_string());
+                    let license_key = generate_signed_license_key(&order.extension_id, &signing_secret);
+
+                    let license = ExtensionLicense {
+                        id: format!("LIC-{}", Uuid::new_v4()),
+                        user_id: order.user_id.clone(),
+                        extension_id: order.extension_id.clone(),
+                        order_id: order.id.clone(),
+                        license_key: license_key.clone(),
+                        purchased_at: chrono::Utc::now().to_rfc3339(),
+                    };
+
+                    if let Err(e) = state.db.grant_extension_license(&license).await {
+                        tracing::error!("Failed to grant license for order {}: {}", order.id, e);
+                    } else {
+                        tracing::info!(
+                            "License granted via ZaloPay query verification for extension '{}' to user '{}'",
+                            order.extension_id,
+                            order.user_id
+                        );
+                        let _ = state.tx.send(FsEvent {
+                            event_type: "extension_licensed".into(),
+                            root_name: order.extension_id.clone(),
+                            path: order.user_id.clone(),
+                            is_dir: false,
+                        });
+                    }
+
+                    if let Ok(Some(refreshed)) = state.db.get_extension_order(&order_id).await {
+                        order = refreshed;
+                    }
+                } else if query_resp.return_code == 2 {
+                    // Transaction failed
+                    let _ = state.db.update_order_status(&order.id, "FAILED", None).await;
+                    if let Ok(Some(refreshed)) = state.db.get_extension_order(&order_id).await {
+                        order = refreshed;
+                    }
+                }
+            }
+        }
     }
 
     let license_key = if order.status == "PAID" {
@@ -433,7 +804,7 @@ pub async fn check_order_status(
     }))
 }
 
-/// Submit buyer's proof of manual / personal MoMo transfer (transitions status to AWAITING_VERIFICATION)
+/// Submit buyer's proof of manual / personal transfer (transitions status to AWAITING_VERIFICATION)
 pub async fn submit_transfer_details(
     State(state): State<AppState>,
     Extension(user): Extension<User>,
@@ -580,11 +951,11 @@ pub async fn admin_approve_order(
     }
 
     let trans_id = format!("ADMIN-CONFIRM-{}", chrono::Utc::now().timestamp_millis());
-    let momo_trans_id = order.momo_trans_id.as_deref().unwrap_or(&trans_id);
+    let gateway_trans_id = order.gateway_trans_id.as_deref().unwrap_or(&trans_id);
 
     state
         .db
-        .update_order_status(&order.id, "PAID", Some(momo_trans_id))
+        .update_order_status(&order.id, "PAID", Some(gateway_trans_id))
         .await?;
 
     let signing_secret = state
@@ -677,28 +1048,40 @@ pub async fn admin_reject_order(
 }
 
 /// Development simulator: Instantly complete a pending order for testing.
-/// Strictly restricted to dev environments or explicit KV_ENABLE_DEV_PAYMENT=true.
 pub async fn dev_simulate_payment(
     State(state): State<AppState>,
     Extension(user): Extension<User>,
     Path(order_id): Path<String>,
 ) -> Result<Json<OrderStatusResponse>> {
+    let cfg = get_zalopay_config();
     let dev_enabled = std::env::var("KV_ENABLE_DEV_PAYMENT")
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-        .unwrap_or(true);
-    let is_debug = cfg!(debug_assertions);
-
-    if user.role != "admin" && !dev_enabled && !is_debug {
-        return Err(AppError::Forbidden(
-            "Developer payment simulator requires admin permissions or KV_ENABLE_DEV_PAYMENT=true.".into(),
-        ));
-    }
-
+        .unwrap_or(false);
     let order = state
         .db
         .get_extension_order(&order_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Order not found".into()))?;
+
+    let is_test_order = cfg.is_sandbox
+        || order
+            .payment_method
+            .as_deref()
+            .map(|m| m.contains("SANDBOX") || m.ends_with("_TEST"))
+            .unwrap_or(false);
+
+    if !is_test_order && !dev_enabled {
+        return Err(AppError::Forbidden(
+            "Payment simulation is strictly disabled for live production orders.".into(),
+        ));
+    }
+
+    let is_debug = cfg!(debug_assertions);
+    if user.role != "admin" && !dev_enabled && !is_debug {
+        return Err(AppError::Forbidden(
+            "Developer payment simulator requires admin permissions or KV_ENABLE_DEV_PAYMENT=true.".into(),
+        ));
+    }
 
     if order.status == "PAID" {
         let license_key = state
@@ -712,7 +1095,7 @@ pub async fn dev_simulate_payment(
         }));
     }
 
-    let fake_trans_id = format!("SIM-{}", chrono::Utc::now().timestamp_millis());
+    let fake_trans_id = format!("SIM-ZP-{}", chrono::Utc::now().timestamp_millis());
     state
         .db
         .update_order_status(&order.id, "PAID", Some(&fake_trans_id))
@@ -756,7 +1139,7 @@ pub async fn dev_simulate_payment(
     }))
 }
 
-/// Activate lifetime license using a code (Signed key, MoMo transId, or Order ID)
+/// Activate lifetime license using a code (Signed key, ZaloPay transId, or Order ID)
 pub async fn activate_license_code(
     State(state): State<AppState>,
     Extension(user): Extension<User>,

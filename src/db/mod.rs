@@ -728,7 +728,7 @@ impl Database {
         Ok(())
     }
 
-    // --- Extension Orders & Licenses (MoMo Payment) ---
+    // --- Extension Orders & Licenses (ZaloPay Payment) ---
     pub async fn create_extension_order(&self, order: &ExtensionOrder) -> Result<()> {
         let conn = self.conn.lock().await;
         conn.execute(
@@ -740,7 +740,7 @@ impl Database {
                 order.extension_id,
                 order.amount,
                 order.status,
-                order.momo_trans_id,
+                order.gateway_trans_id,
                 order.user_note,
                 order.payment_method,
                 order.created_at,
@@ -755,13 +755,13 @@ impl Database {
         &self,
         order_id: &str,
         status: &str,
-        momo_trans_id: Option<&str>,
+        gateway_trans_id: Option<&str>,
     ) -> Result<()> {
         let conn = self.conn.lock().await;
         let now = chrono::Utc::now().to_rfc3339();
         conn.execute(
             "UPDATE extension_orders SET status = ?1, momo_trans_id = COALESCE(?2, momo_trans_id), updated_at = ?3 WHERE id = ?4",
-            params![status, momo_trans_id, now, order_id],
+            params![status, gateway_trans_id, now, order_id],
         )
         .map_err(|e| AppError::Db(format!("Failed to update order status: {}", e)))?;
         Ok(())
@@ -805,7 +805,7 @@ impl Database {
                     extension_id: row.get(2)?,
                     amount: row.get(3)?,
                     status: row.get(4)?,
-                    momo_trans_id: row.get(5)?,
+                    gateway_trans_id: row.get(5)?,
                     user_note: row.get(6)?,
                     payment_method: row.get(7)?,
                     created_at: row.get(8)?,
@@ -867,7 +867,7 @@ impl Database {
                         extension_id: row.get(2)?,
                         amount: row.get(3)?,
                         status: row.get(4)?,
-                        momo_trans_id: row.get(5)?,
+                        gateway_trans_id: row.get(5)?,
                         user_note: row.get(6)?,
                         payment_method: row.get(7)?,
                         created_at: row.get(8)?,
@@ -895,7 +895,7 @@ impl Database {
                         extension_id: row.get(2)?,
                         amount: row.get(3)?,
                         status: row.get(4)?,
-                        momo_trans_id: row.get(5)?,
+                        gateway_trans_id: row.get(5)?,
                         user_note: row.get(6)?,
                         payment_method: row.get(7)?,
                         created_at: row.get(8)?,
@@ -1072,7 +1072,7 @@ impl Database {
         let (extension_id, order_id, license_key, purchased_at) = match found_license {
             Some(data) => data,
             None => {
-                // 2. Look for confirmed/paid order by order id or MoMo trans_id
+                // 2. Look for confirmed/paid order by order id or ZaloPay trans_id
                 let mut order_stmt = conn
                     .prepare(
                         "SELECT id, extension_id, momo_trans_id, updated_at 
@@ -1103,7 +1103,7 @@ impl Database {
                     let key = if ext_id == "kv-files-pro-all" {
                         format!("KV-PRO-{}", suffix)
                     } else {
-                        format!("MOMO-{}-{}", trans_id, suffix)
+                        format!("ZP-{}-{}", trans_id, suffix)
                     };
                     (ext_id, ord_id, key, p_at)
                 } else if let Ok(payload) = crate::licensing::verify_pro_license(code_trimmed, None) {
@@ -1121,9 +1121,9 @@ impl Database {
                             .map_err(|e| AppError::Db(e.to_string()))?;
                         stmt.query_row([], |row| row.get::<_, String>(0)).ok()
                     };
-                    let momo_secret = std::env::var("MOMO_SECRET_KEY")
-                        .unwrap_or_else(|_| "K951B6PE1wa8ngfBWja1mi1jWbvZ0eeq".into());
-                    let mut candidate_secrets = vec![crate::api::payments::DEFAULT_LICENSE_SECRET, &momo_secret];
+                    let zalopay_key = std::env::var("ZALOPAY_KEY1")
+                        .unwrap_or_else(|_| "sdngKKJmqEMzvhQgsvDQIUybtEcngMpl".into());
+                    let mut candidate_secrets = vec![crate::api::payments::DEFAULT_LICENSE_SECRET, &zalopay_key];
                     if let Some(ref is) = instance_secret {
                         candidate_secrets.push(is);
                     }
@@ -1228,9 +1228,9 @@ impl Database {
                 .map_err(|e| AppError::Db(e.to_string()))?;
             stmt.query_row([], |row| row.get::<_, String>(0)).ok()
         };
-        let momo_secret = std::env::var("MOMO_SECRET_KEY")
-            .unwrap_or_else(|_| "K951B6PE1wa8ngfBWja1mi1jWbvZ0eeq".into());
-        let mut candidate_secrets = vec![crate::api::payments::DEFAULT_LICENSE_SECRET, &momo_secret];
+        let zalopay_key = std::env::var("ZALOPAY_KEY1")
+            .unwrap_or_else(|_| "sdngKKJmqEMzvhQgsvDQIUybtEcngMpl".into());
+        let mut candidate_secrets = vec![crate::api::payments::DEFAULT_LICENSE_SECRET, &zalopay_key];
         if let Some(ref is) = instance_secret {
             candidate_secrets.push(is);
         }
@@ -1289,7 +1289,7 @@ impl Database {
                 return Ok(Some(payload));
             }
             let trimmed = key.trim();
-            if !trimmed.is_empty() && (trimmed.starts_with("KV-") || trimmed.starts_with("MOMO-")) {
+            if !trimmed.is_empty() && (trimmed.starts_with("KV-") || trimmed.starts_with("ZP-") || trimmed.starts_with("MOMO-")) {
                 return Ok(Some(crate::licensing::LicensePayload {
                     id: "LEGACY-LIC".into(),
                     user: "admin".into(),

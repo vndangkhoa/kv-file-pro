@@ -180,6 +180,7 @@ export interface ExtensionManifest {
 
 export interface PaymentCreateResponse {
   order_id: string;
+  app_trans_id?: string;
   extension_id: string;
   amount: number;
   pay_url: string;
@@ -187,6 +188,13 @@ export interface PaymentCreateResponse {
   deeplink?: string;
   status: string;
   is_mock: boolean;
+  is_test_mode?: boolean;
+  bank_name?: string;
+  bank_account?: string;
+  account_name?: string;
+  merchant_code?: string;
+  store_id?: string;
+  transfer_content?: string;
   phone_number?: string;
   receiver_name?: string;
 }
@@ -206,6 +214,8 @@ export interface OrderStatusResponse {
   extension_id: string;
   amount: number;
   status: 'PENDING' | 'AWAITING_VERIFICATION' | 'PAID' | 'FAILED' | 'CANCELLED' | string;
+  gateway_trans_id?: string;
+  app_trans_id?: string;
   momo_trans_id?: string;
   user_note?: string;
   payment_method?: string;

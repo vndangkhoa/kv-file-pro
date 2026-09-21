@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kv-file-shell-v2';
+const CACHE_NAME = 'kv-file-shell-v3';
 const PRECACHE_ASSETS = [
   '/',
   '/manifest.webmanifest',
@@ -38,10 +38,26 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Stale-while-revalidate for static UI assets
+  // Safe cache & network fallback that NEVER resolves with undefined
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request)
+      // 1. If cached, serve immediately and update in background
+      if (cachedResponse) {
+        fetch(event.request)
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+              const responseToCache = networkResponse.clone();
+              caches.open(CACHE_NAME).then((cache) => {
+                cache.put(event.request, responseToCache);
+              });
+            }
+          })
+          .catch(() => {});
+        return cachedResponse;
+      }
+
+      // 2. Not cached: fetch from network
+      return fetch(event.request)
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
             const responseToCache = networkResponse.clone();
@@ -51,9 +67,14 @@ self.addEventListener('fetch', (event) => {
           }
           return networkResponse;
         })
-        .catch(() => cachedResponse);
-
-      return cachedResponse || fetchPromise;
+        .catch(() => {
+          // Never resolve with undefined: return 503 response if both cache and network fail
+          return new Response('Network unavailable or server restarting', {
+            status: 503,
+            statusText: 'Service Unavailable',
+            headers: new Headers({ 'Content-Type': 'text/plain' })
+          });
+        });
     })
   );
 });

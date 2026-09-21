@@ -307,7 +307,7 @@ export const MillerColumnsView: React.FC = () => {
                 <button
                   onClick={() => openSettings('extensions')}
                   title={`Unlock ${availableExtension.name} in Extension Store`}
-                  className="w-full flex items-center justify-center gap-2 py-2 bg-gradient-to-r from-[#a50064] to-[#d82d8b] hover:from-[#8a0053] hover:to-[#be2077] text-white rounded-xl text-xs font-semibold transition-all shadow-xs active:scale-[0.98]"
+                  className="w-full flex items-center justify-center gap-2 py-2 bg-gradient-to-r from-[#0068ff] to-[#0052cc] hover:from-[#0057d9] hover:to-[#0041a8] text-white rounded-xl text-xs font-semibold transition-all shadow-xs active:scale-[0.98]"
                 >
                   <Crown size={14} className="text-amber-300" />
                   <span>Unlock in Extension Store</span>

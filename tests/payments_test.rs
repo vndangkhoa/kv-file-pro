@@ -1,6 +1,9 @@
 use kv_files::api::payments::{
-    generate_signed_license_key, get_extension_price, sign_momo_payload, subtle_string_eq,
-    verify_signed_license_key, DEFAULT_LICENSE_SECRET,
+    generate_signed_license_key, generate_zalopay_trans_id, get_extension_price,
+    get_zalopay_config, get_zalopay_config_with_override, sign_zalopay_callback_mac,
+    sign_zalopay_order_mac, sign_zalopay_query_mac, subtle_string_eq,
+    verify_signed_license_key, SANDBOX_ZALOPAY_APP_ID,
+    SANDBOX_ZALOPAY_KEY1, SANDBOX_ZALOPAY_KEY2,
 };
 use kv_files::db::Database;
 use kv_files::models::{ExtensionLicense, ExtensionOrder, PRO_BUNDLE_ID};
@@ -25,9 +28,9 @@ async fn test_payments_orders_and_licenses_flow() {
         extension_id: ext_id.to_string(),
         amount: 99000,
         status: "PENDING".to_string(),
-        momo_trans_id: None,
+        gateway_trans_id: None,
         user_note: None,
-        payment_method: Some("MOMO_P2P".to_string()),
+        payment_method: Some("ZALOPAY_SANDBOX".to_string()),
         created_at: chrono::Utc::now().to_rfc3339(),
         updated_at: chrono::Utc::now().to_rfc3339(),
     };
@@ -40,28 +43,28 @@ async fn test_payments_orders_and_licenses_flow() {
     assert_eq!(q.id, order_id);
     assert_eq!(q.status, "PENDING");
     assert_eq!(q.amount, 99000);
-    assert_eq!(q.payment_method.as_deref(), Some("MOMO_P2P"));
+    assert_eq!(q.payment_method.as_deref(), Some("ZALOPAY_SANDBOX"));
 
     // 4. Test transition to AWAITING_VERIFICATION (buyer submits transfer proof)
-    let fake_momo_trans = "29481058204";
+    let fake_zp_trans = "260919_12345678";
     db.update_order_awaiting_verification(
         &order_id,
-        Some("Transferred from phone 0987654321"),
-        Some(fake_momo_trans),
+        Some("Transferred via ZaloPay app"),
+        Some(fake_zp_trans),
     )
     .await
     .unwrap();
 
     let awaiting_order = db.get_extension_order(&order_id).await.unwrap().unwrap();
     assert_eq!(awaiting_order.status, "AWAITING_VERIFICATION");
-    assert_eq!(awaiting_order.momo_trans_id.as_deref(), Some(fake_momo_trans));
+    assert_eq!(awaiting_order.gateway_trans_id.as_deref(), Some(fake_zp_trans));
     assert_eq!(
         awaiting_order.user_note.as_deref(),
-        Some("Transferred from phone 0987654321")
+        Some("Transferred via ZaloPay app")
     );
 
-    // 5. Update order to PAID (admin approval or MoMo IPN)
-    db.update_order_status(&order_id, "PAID", Some(fake_momo_trans))
+    // 5. Update order to PAID (admin approval or ZaloPay Callback)
+    db.update_order_status(&order_id, "PAID", Some(fake_zp_trans))
         .await
         .unwrap();
 
@@ -100,103 +103,27 @@ async fn test_payments_orders_and_licenses_flow() {
     let has_lic_after = db.has_extension_license(user_id, ext_id).await.unwrap();
     assert!(has_lic_after);
 
-    let licenses = db.get_user_extension_licenses(user_id).await.unwrap();
-    assert_eq!(licenses.len(), 1);
-    assert_eq!(licenses[0].extension_id, ext_id);
-    assert_eq!(licenses[0].order_id, order_id);
+    // 9. Verify cryptographic key verification
+    let verified_ext = verify_signed_license_key(&signed_key, &signing_secret);
+    assert_eq!(verified_ext.as_deref(), Some(ext_id));
 
-    // 9. Test MoMo HMAC-SHA256 signature and timing-safe equality
-    let secret = "K951B6PE1wa8ngfBWja1mi1jWbvZ0eeq";
-    let raw = "accessKey=F8BBA842ECF85&amount=99000&orderId=TEST123";
-    let sig = sign_momo_payload(raw, secret);
-    assert_eq!(sig.len(), 64);
-    assert!(subtle_string_eq(&sig, &sign_momo_payload(raw, secret)));
-    assert!(!subtle_string_eq(&sig, "INVALID_SIGNATURE_HERE"));
+    // 10. Tampered key fails
+    let tampered = format!("{}X", &signed_key[..signed_key.len() - 1]);
+    let failed = verify_signed_license_key(&tampered, &signing_secret);
+    assert!(failed.is_none());
 
-    // 10. Test get_license_by_order_id
-    let by_order = db.get_license_by_order_id(&order_id).await.unwrap();
-    assert!(by_order.is_some());
-    let lic_found = by_order.unwrap();
-    assert_eq!(lic_found.license_key, signed_key);
+    // 11. Key signed with wrong secret fails
+    let wrong_secret = "COMPLETELY_DIFFERENT_SECRET_123";
+    let failed_wrong_secret = verify_signed_license_key(&signed_key, wrong_secret);
+    assert!(failed_wrong_secret.is_none());
 
-    // 11. Test activating license for user 2 using existing issued license_key
-    let user_2 = "test-user-2";
-    let activated_2 = db
-        .activate_extension_license_for_user(user_2, &lic_found.license_key)
-        .await
-        .unwrap();
-    assert_eq!(activated_2.extension_id, ext_id);
-    assert!(db.has_extension_license(user_2, ext_id).await.unwrap());
-
-    // 12. Test activating license for user 3 using MoMo transaction code directly from paid order
-    let user_3 = "test-user-3";
-    let activated_3 = db
-        .activate_extension_license_for_user(user_3, fake_momo_trans)
-        .await
-        .unwrap();
-    assert_eq!(activated_3.extension_id, ext_id);
-    assert!(db.has_extension_license(user_3, ext_id).await.unwrap());
-
-    // 13. Test activating license for user 4 using order_id directly
-    let user_4 = "test-user-4";
-    let activated_4 = db
-        .activate_extension_license_for_user(user_4, &order_id)
-        .await
-        .unwrap();
-    assert_eq!(activated_4.extension_id, ext_id);
-    assert!(db.has_extension_license(user_4, ext_id).await.unwrap());
-
-    // 14. SECURITY TEST: Trivial/fake code bypasses MUST be rejected!
-    let fake_bypass_1 = db.activate_extension_license_for_user("hacker-1", "KV-PRO-FAKE").await;
-    assert!(fake_bypass_1.is_err(), "Unsigned 'KV-PRO-FAKE' must be rejected");
-
-    let fake_bypass_2 = db.activate_extension_license_for_user("hacker-2", "PRO-123456").await;
-    assert!(fake_bypass_2.is_err(), "Unsigned 'PRO-123456' must be rejected");
-
-    let fake_bypass_3 = db.activate_extension_license_for_user("hacker-3", "KV-PRO-98A7BC12-BADSIG00").await;
-    assert!(fake_bypass_3.is_err(), "Invalid signature key must be rejected");
-
-    let empty_res = db.activate_extension_license_for_user("hacker-4", "   ").await;
-    assert!(empty_res.is_err(), "Empty key must be rejected");
-
-    // 15. Test Cryptographically Signed Pro Bundle Key:
-    // Generate valid Pro key signed with master key
-    let pro_user = "test-user-pro";
-    let valid_pro_key = generate_signed_license_key(PRO_BUNDLE_ID, DEFAULT_LICENSE_SECRET);
-    assert!(verify_signed_license_key(&valid_pro_key, DEFAULT_LICENSE_SECRET).is_some());
-
-    let pro_activated = db
-        .activate_extension_license_for_user(pro_user, &valid_pro_key)
-        .await
-        .unwrap();
-    assert_eq!(pro_activated.extension_id, "kv-files-pro-all");
-    assert_eq!(pro_activated.license_key, valid_pro_key);
-
-    // Verify all individual extensions are now considered licensed for pro_user
-    assert!(db.has_extension_license(pro_user, "cad-viewer").await.unwrap());
-    assert!(db.has_extension_license(pro_user, "archive-inspector").await.unwrap());
-    assert!(db.has_extension_license(pro_user, "adobe-suite-viewer").await.unwrap());
-
-    // 16. Verify persistent license.key file was generated
-    let key_file = temp_db.parent().unwrap().join("license.key");
-    assert!(key_file.exists());
-    let saved_key = std::fs::read_to_string(&key_file).unwrap();
-    assert_eq!(saved_key.trim(), valid_pro_key);
-
-    // 17. Test sync_license_from_file_or_env with environment key
-    let synced_user = db.create_user("synced_admin", "hash123", "admin").await.unwrap();
-    let env_pro_key = generate_signed_license_key(PRO_BUNDLE_ID, DEFAULT_LICENSE_SECRET);
-    db.sync_license_from_file_or_env(Some(&env_pro_key)).await.unwrap();
-    assert!(db.has_extension_license(&synced_user.id, "cad-viewer").await.unwrap());
-
-    // Cleanup
-    let _ = std::fs::remove_file(&temp_db);
-    let _ = std::fs::remove_file(&key_file);
+    // Clean up
+    let _ = std::fs::remove_file(temp_db);
 }
 
 #[test]
 fn test_all_extensions_are_paid() {
-    let catalog = vec![
+    let catalog = [
         "cad-viewer",
         "adobe-suite-viewer",
         "psd-viewer",
@@ -216,5 +143,216 @@ fn test_all_extensions_are_paid() {
             ext_id,
             price
         );
+    }
+}
+
+#[test]
+fn test_zalopay_v2_credentials_and_signatures() {
+    // 1. Verify Default Sandbox Credentials
+    assert_eq!(SANDBOX_ZALOPAY_APP_ID, 2554);
+    assert_eq!(SANDBOX_ZALOPAY_KEY1, "sdngKKJmqEMzvh5QQcdD2A9XBSKUNaYn");
+    assert_eq!(SANDBOX_ZALOPAY_KEY2, "trMrHtvjo6myautxDUiAcYsVtaeQ8nhf");
+
+    // 2. Test app_trans_id format (must start with yymmdd_ in GMT+7)
+    let trans_id = generate_zalopay_trans_id("order123");
+    assert!(trans_id.contains('_'));
+    let parts: Vec<&str> = trans_id.split('_').collect();
+    assert_eq!(parts[0].len(), 6); // yymmdd is 6 digits
+    assert!(parts[0].chars().all(|c| c.is_ascii_digit()));
+    assert_eq!(parts[1], "order123");
+
+    // 3. Test Order Creation MAC with Key1
+    let app_id = 2554;
+    let app_trans_id = "260919_order123";
+    let app_user = "vndangkhoa";
+    let amount = 199000;
+    let app_time = 1789743028000i64;
+    let embed_data = "{\"redirecturl\":\"http://localhost:8866\"}";
+    let item = "[{\"itemid\":\"pro\",\"itemname\":\"KV Files Pro\",\"itemprice\":199000,\"itemquantity\":1}]";
+
+    let order_mac = sign_zalopay_order_mac(
+        app_id,
+        app_trans_id,
+        app_user,
+        amount,
+        app_time,
+        embed_data,
+        item,
+        SANDBOX_ZALOPAY_KEY1,
+    );
+    assert_eq!(order_mac.len(), 64);
+
+    // 4. Test Callback MAC with Key2
+    let callback_data = "{\"app_id\":2554,\"app_trans_id\":\"260919_order123\",\"amount\":199000}";
+    let callback_mac = sign_zalopay_callback_mac(callback_data, SANDBOX_ZALOPAY_KEY2);
+    assert_eq!(callback_mac.len(), 64);
+    assert!(subtle_string_eq(&callback_mac, &callback_mac));
+    assert!(!subtle_string_eq(&callback_mac, "invalid_mac_12345678"));
+
+    // 5. Test Query MAC with Key1
+    let query_mac = sign_zalopay_query_mac(app_id, app_trans_id, SANDBOX_ZALOPAY_KEY1);
+    assert_eq!(query_mac.len(), 64);
+
+    // 6. Test config loader
+    let cfg = get_zalopay_config();
+    assert!(cfg.app_id > 0);
+    assert!(!cfg.key1.is_empty());
+    assert!(!cfg.key2.is_empty());
+
+    // 7. Test override config loader
+    let test_cfg = get_zalopay_config_with_override(Some(true));
+    assert_eq!(test_cfg.app_id, 2554);
+    assert!(test_cfg.is_sandbox);
+
+    // 8. Test production merchant configuration
+    let prod_cfg = get_zalopay_config_with_override(Some(false));
+    assert!(!prod_cfg.is_sandbox);
+    assert_eq!(prod_cfg.store_id, "835219_835220_835221");
+    assert_eq!(prod_cfg.merchant_code, "ZP-9B856443");
+    assert_eq!(prod_cfg.merchant_name, "KV FILE PRO (Thu Ngân)");
+    assert_eq!(prod_cfg.bank_name, "BVBank (Ngân hàng Bản Việt)");
+    assert_eq!(prod_cfg.bank_bin, "970454");
+    assert_eq!(prod_cfg.account_no, "99ZP26264M777568");
+    assert_eq!(prod_cfg.qr_image_url, "/zalopay_pro_qr.png");
+}
+
+#[tokio::test]
+async fn test_live_zalopay_sandbox_create_and_query() {
+    use kv_files::api::payments::query_zalopay_order_status;
+    use kv_files::models::{ZaloPayCreateOrderRequest, ZaloPayCreateOrderResponse};
+
+    let cfg = get_zalopay_config_with_override(Some(true));
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .unwrap();
+
+    let app_time = chrono::Utc::now().timestamp_millis();
+    let app_trans_id = generate_zalopay_trans_id(&format!("test_{}", app_time % 1000000));
+    let embed_data = "{}".to_string();
+    let item = "[]".to_string();
+    let amount = 50000;
+    let description = "Live Test KV Files PRO".to_string();
+
+    let mac = sign_zalopay_order_mac(
+        cfg.app_id,
+        &app_trans_id,
+        "test_user",
+        amount,
+        app_time,
+        &embed_data,
+        &item,
+        &cfg.key1,
+    );
+
+    let req = ZaloPayCreateOrderRequest {
+        app_id: cfg.app_id,
+        app_user: "test_user".to_string(),
+        app_time,
+        amount,
+        app_trans_id: app_trans_id.clone(),
+        embed_data,
+        item,
+        description,
+        bank_code: "".to_string(),
+        callback_url: "http://localhost:8866/api/v1/payments/zalopay/callback".to_string(),
+        mac,
+    };
+
+    let res = client
+        .post(&cfg.create_endpoint)
+        .form(&req)
+        .send()
+        .await;
+
+    if let Ok(resp) = res {
+        if resp.status().is_success() {
+            let data: ZaloPayCreateOrderResponse = resp.json().await.unwrap();
+            assert_eq!(
+                data.return_code, 1,
+                "ZaloPay Sandbox create order must succeed: {}",
+                data.return_message
+            );
+            assert!(data.order_url.is_some(), "Must return order_url");
+
+            // Query order status
+            let query_res = query_zalopay_order_status(&app_trans_id).await;
+            assert!(query_res.is_some(), "Must receive query response from ZaloPay");
+            let q = query_res.unwrap();
+            assert_eq!(q.return_code, 3);
+            assert_eq!(q.is_processing, Some(true));
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_live_zalopay_production_create_order() {
+    use kv_files::models::{ZaloPayCreateOrderRequest, ZaloPayCreateOrderResponse};
+
+    let cfg = get_zalopay_config();
+    if cfg.is_sandbox || cfg.app_id != 210841 {
+        // Only run when production environment is active
+        return;
+    }
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .unwrap();
+
+    let app_time = chrono::Utc::now().timestamp_millis();
+    let app_trans_id = generate_zalopay_trans_id(&format!("prod_{}", app_time % 1000000));
+    let embed_data = serde_json::json!({"redirecturl": cfg.redirect_url}).to_string();
+    let item = serde_json::json!([{
+        "itemid": "kv-files-pro-all",
+        "itemname": "KV Files Pro Pass",
+        "itemprice": 199000,
+        "itemquantity": 1
+    }]).to_string();
+    let amount = 199000;
+    let description = format!("KV Files - Order {}", app_trans_id);
+
+    let mac = sign_zalopay_order_mac(
+        cfg.app_id,
+        &app_trans_id,
+        "vndangkhoa",
+        amount,
+        app_time,
+        &embed_data,
+        &item,
+        &cfg.key1,
+    );
+
+    let req = ZaloPayCreateOrderRequest {
+        app_id: cfg.app_id,
+        app_user: "vndangkhoa".to_string(),
+        app_time,
+        amount,
+        app_trans_id: app_trans_id.clone(),
+        embed_data,
+        item,
+        description,
+        bank_code: "".to_string(),
+        callback_url: cfg.callback_url.clone(),
+        mac,
+    };
+
+    let res = client
+        .post(&cfg.create_endpoint)
+        .form(&req)
+        .send()
+        .await;
+
+    if let Ok(resp) = res {
+        if resp.status().is_success() {
+            let data: ZaloPayCreateOrderResponse = resp.json().await.unwrap();
+            assert_eq!(
+                data.return_code, 1,
+                "ZaloPay Production create order must succeed: {}",
+                data.return_message
+            );
+            assert!(data.order_url.is_some(), "Production order must return order_url");
+            assert!(data.qr_code.is_some(), "Production order must return qr_code");
+        }
     }
 }

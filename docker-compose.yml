@@ -13,14 +13,15 @@ services:
       - KV_DATA_DIR=/data
       - KV_STORAGE_ROOTS=/storage
       - RUST_LOG=kv_files=info,tower_http=info
-      # MoMo Payment Settings (Personal Transfer or Official Gateway)
-      - MOMO_PHONE_NUMBER=0398300340
-      # - MOMO_RECEIVER_NAME=KHOA VO
-      # - MOMO_PARTNER_CODE=YOUR_PARTNER_CODE
-      # - MOMO_ACCESS_KEY=YOUR_ACCESS_KEY
-      # - MOMO_SECRET_KEY=YOUR_SECRET_KEY
-      # - MOMO_ENDPOINT=https://payment.momo.vn/v2/gateway/api/create
-      # - MOMO_IPN_URL=https://your-domain.com/api/v1/payments/momo/ipn
+      # ZaloPay Official Payment Gateway Credentials (v2)
+      - ZALOPAY_ENV=sandbox
+      - ZALOPAY_APP_ID=2554
+      - ZALOPAY_KEY1=sdngKKJmqEMzvh5QQcdD2A9XBSKUNaYn
+      - ZALOPAY_KEY2=trMrHtvjo6myautxDUiAcYsVtaeQ8nhf
+      - ZALOPAY_CREATE_ENDPOINT=https://sb-openapi.zalopay.vn/v2/create
+      - ZALOPAY_QUERY_ENDPOINT=https://sb-openapi.zalopay.vn/v2/query
+      - ZALOPAY_REDIRECT_URL=http://localhost:8866/settings?tab=extensions
+      - ZALOPAY_CALLBACK_URL=http://localhost:8866/api/v1/payments/zalopay/callback
     volumes:
       - ./data:/data
       - ./storage:/storage

@@ -7,22 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.1.0] - 2026-09-16
+## [2.1.0] - 2026-09-21
 
-### 🚀 Major Feature Release: KV Files PRO Commercial Suite & Asymmetric Licensing
-Version 2.1.0 introduces **KV Files PRO**, bringing an enterprise-grade commercial extension ecosystem, offline asymmetric Ed25519 cryptographic licensing, integrated MoMo payment gateway (API v2 & personal QR code matching), universal 3D CAD/BIM studio viewport, Adobe Creative Suite studio, typography specimen studio, sysvis workflow animator, and a unified service management script (`launch.sh`).
+### 🚀 Major Feature Release: KV Files PRO Commercial Suite, Official ZaloPay Production & Synology SPK
+Version 2.1.0 marks the official public release of **KV Files PRO**, bringing an enterprise-grade commercial extension ecosystem, offline asymmetric Ed25519 cryptographic licensing, official approved ZaloPay Production Payment Gateway & VietQR, official Synology DSM 7.x Package Center integration, multi-registry Docker distribution, and universal viewports for engineering, design, and development assets.
 
 ### Added
+- **Official ZaloPay Production Payment Gateway & VietQR**:
+  - Live production activation with approved Merchant App ID `210841`, Store ID `835219_835220_835221`, and partner BVBank virtual account (`99ZP26264M777568`).
+  - Dual-key HMAC-SHA256 cryptography (Key1 for order generation & query, Key2 for IPN webhook callbacks).
+  - Streamlined, privacy-focused checkout modal ([ZaloPayPaymentModal.tsx](file:///mnt/data/Projects/kv-file_PRO/web/src/components/modals/settings/ZaloPayPaymentModal.tsx)) with clean QR matrix centerpiece, zero address exposure, quick-copy transfer details, and admin one-click verification.
+  - Multi-banking compatibility supporting ZaloPay app and 40+ Vietnamese banking apps via VietQR / Napas247 standard.
+- **Synology DSM 7.x Package Center (SPK) Distribution**:
+  - Published and activated official Synology SPK package `kv-file-pro` at [`https://syno.vndns.net/package/kv-file-pro`](https://syno.vndns.net/package/kv-file-pro).
+  - Automated installation with random free port discovery, DSM desktop application launcher icon, and automatic shared storage detection across `/volume1` through `/volume5`.
+- **Multi-Registry Public Container Distribution**:
+  - Automated multi-registry builds pushing `latest` and `2.1.0` tags to:
+    - **Docker Hub**: `vndangkhoa/kv-file-pro`
+    - **GitHub Packages (GHCR)**: `ghcr.io/vndangkhoa/kv-file-pro`
+    - **Forgejo Instance 1**: `git.khoavo.vndns.net/vndangkhoa/kv-file-pro`
+    - **Forgejo Instance 2**: `git.khoavo.myds.me/vndangkhoa/kv-file-pro`
 - **Asymmetric Ed25519 Cryptographic Licensing Engine**:
   - Offline digital signature licensing architecture built with `ed25519-dalek` ([licensing.rs](file:///mnt/data/Projects/kv-file_PRO/src/licensing.rs)).
   - Hardcoded master public key verification ensuring 100% offline license validation without external telemetry or DRM phone-home calls.
   - CLI key generator and license verification tool ([launch.sh keygen](file:///mnt/data/Projects/kv-file_PRO/launch.sh), [keygen.py](file:///mnt/data/Projects/kv-file_PRO/scripts/keygen.py)).
-  - Support for lifetime and timestamp-expiring license keys (`KVPRO-...`) with tamper-proof signature verification.
-- **MoMo Payment Gateway & Automated Personal QR Matching**:
-  - Direct integration with MoMo API v2 ([payments.rs](file:///mnt/data/Projects/kv-file_PRO/src/api/payments.rs), [models/payments.rs](file:///mnt/data/Projects/kv-file_PRO/src/models/payments.rs)).
-  - Automatic QR code generation for Vietnamese personal bank / MoMo transfer (`MOMO_PHONE_NUMBER=0398300340`) with unique order code tracking (`KV-...`).
-  - Interactive MoMo checkout modal ([MoMoPaymentModal.tsx](file:///mnt/data/Projects/kv-file_PRO/web/src/components/modals/settings/MoMoPaymentModal.tsx)).
-  - Comprehensive Admin Orders Management dashboard ([AdminOrdersModal.tsx](file:///mnt/data/Projects/kv-file_PRO/web/src/components/modals/settings/AdminOrdersModal.tsx)) with live status filters, manual payment approval, and license key generation.
+  - Dual-layer licensing model: user account binding with automatic server-level promotion for private host deployments (`data/license.key`).
 - **Universal CAD & BIM Studio Viewport**:
   - WebGL 3D CAD/BIM engine supporting AutoCAD (`.dwg`, `.dxf`), IFC BIM structures, and solid 3D models (`.step`, `.stp`, `.iges`, `.stl`, `.obj`).
   - WebAssembly-powered DWG parser integration via `@mlightcad/libredwg-web` with embedded `libredwg-web.wasm`.
@@ -36,19 +45,14 @@ Version 2.1.0 introduces **KV Files PRO**, bringing an enterprise-grade commerci
   - Dynamic system workflow visualization powered by Mermaid engine and dagre layout with real-time SVG animated flow pulses.
 - **In-App Extensions Ecosystem & Catalog**:
   - Modular extensions store and manager ([ExtensionsTab.tsx](file:///mnt/data/Projects/kv-file_PRO/web/src/components/modals/settings/ExtensionsTab.tsx), [useExtensionStore.ts](file:///mnt/data/Projects/kv-file_PRO/web/src/stores/useExtensionStore.ts)).
-  - Dynamic host previewer ([ExtensionPreviewHost.tsx](file:///mnt/data/Projects/kv-file_PRO/web/src/components/preview/ExtensionPreviewHost.tsx)) for pluggable file format renderers.
+  - Pluggable file format preview host ([ExtensionPreviewHost.tsx](file:///mnt/data/Projects/kv-file_PRO/web/src/components/preview/ExtensionPreviewHost.tsx)).
 - **Unified Production CLI & Service Daemon (`launch.sh`)**:
-  - Single executable script providing `start` (daemon/foreground), `stop`, `restart`, `status`, `logs`, `build` (`--pro`/`--community`), `keygen`, `dev`, `mock`, and `docker` workflows.
-  - Automatic network LAN IP detection, process PID tracking, and background health probe monitoring.
-- **Mock File Extensions Generator (`scripts/spawn_mock_files.py`)**:
-  - Comprehensive script generating realistic sample assets for all supported PRO formats (CAD, Adobe, fonts, 3D models, code configs) into `./storage`.
-- **Security & Privacy Governance**:
-  - Configured private repository access on GitHub and both Forgejo instances (`git.khoavo.myds.me` and `git.khoavo.vndns.net`) to safeguard proprietary PRO source code.
+  - Single executable script providing `start`, `stop`, `restart`, `status`, `logs`, `build`, `keygen`, and health checks.
 
 ### Changed
-- Bumped application version to `2.1.0` across Rust backend (`Cargo.toml`) and React frontend (`web/package.json`).
-- Dynamic runtime version detection from Cargo package metadata.
-- Embedded Hugo documentation directly into frontend build artifacts.
+- Refactored ZaloPay checkout UI to remove merchant physical address strings and simplify scan experience.
+- Updated service worker caches to `v3` preventing fetch promise exceptions.
+- Embedded complete Hugo documentation into frontend build artifacts.
 
 ---
 

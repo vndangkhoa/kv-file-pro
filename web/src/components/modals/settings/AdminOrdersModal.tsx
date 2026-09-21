@@ -156,6 +156,8 @@ export const AdminOrdersModal: React.FC<AdminOrdersModalProps> = ({ onClose }) =
       o.id.toLowerCase().includes(q) ||
       o.user_id.toLowerCase().includes(q) ||
       o.extension_id.toLowerCase().includes(q) ||
+      (o.gateway_trans_id && o.gateway_trans_id.toLowerCase().includes(q)) ||
+      (o.app_trans_id && o.app_trans_id.toLowerCase().includes(q)) ||
       (o.momo_trans_id && o.momo_trans_id.toLowerCase().includes(q)) ||
       (o.user_note && o.user_note.toLowerCase().includes(q))
     );
@@ -227,7 +229,7 @@ export const AdminOrdersModal: React.FC<AdminOrdersModalProps> = ({ onClose }) =
                 </span>
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Review manual bank/MoMo transfers and issue cryptographically signed licenses.
+                Review manual bank / ZaloPay transfers and issue cryptographically signed licenses.
               </p>
             </div>
           </div>
@@ -369,13 +371,13 @@ export const AdminOrdersModal: React.FC<AdminOrdersModalProps> = ({ onClose }) =
                     </div>
 
                     {/* Customer Notes / Reference Proof */}
-                    {(order.user_note || order.momo_trans_id) && (
+                    {(order.user_note || order.gateway_trans_id || order.app_trans_id || order.momo_trans_id) && (
                       <div className="mt-2 p-2.5 rounded-xl bg-gray-50 dark:bg-[#18181f] border border-gray-100 dark:border-[#292933] text-[11px] space-y-1">
-                        {order.momo_trans_id && (
+                        {(order.gateway_trans_id || order.app_trans_id || order.momo_trans_id) && (
                           <div className="flex items-center gap-1.5 font-mono text-gray-700 dark:text-gray-300">
-                            <span className="text-gray-400">Customer Trans ID:</span>
+                            <span className="text-gray-400">Gateway Trans ID:</span>
                             <span className="font-bold text-blue-600 dark:text-blue-400">
-                              {order.momo_trans_id}
+                              {order.gateway_trans_id || order.app_trans_id || order.momo_trans_id}
                             </span>
                           </div>
                         )}

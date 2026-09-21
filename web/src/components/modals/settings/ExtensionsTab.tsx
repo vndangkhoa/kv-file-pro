@@ -26,8 +26,8 @@ import {
 } from 'lucide-react';
 import { useExtensionStore } from '../../../stores/useExtensionStore';
 import { useAuthStore } from '../../../stores/useAuthStore';
-import { ExtensionCategory, ExtensionManifest } from '../../../types';
-import { MoMoPaymentModal } from './MoMoPaymentModal';
+import { ExtensionCategory } from '../../../types';
+import { ZaloPayPaymentModal } from './ZaloPayPaymentModal';
 import { AdminOrdersModal } from './AdminOrdersModal';
 
 interface RedeemLicenseModalProps {
@@ -46,7 +46,7 @@ const RedeemLicenseModal: React.FC<RedeemLicenseModalProps> = ({ onClose, onSucc
     e.preventDefault();
     const trimmed = code.trim();
     if (!trimmed) {
-      setError('Please enter a valid activation code or MoMo transaction ID');
+      setError('Please enter a valid activation code or ZaloPay transaction ID');
       return;
     }
 
@@ -90,12 +90,12 @@ const RedeemLicenseModal: React.FC<RedeemLicenseModalProps> = ({ onClose, onSucc
 
         <form onSubmit={handleActivate} className="p-6 space-y-4">
           <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-            Enter your <strong>Lifetime License Key</strong> or your <strong>MoMo Transaction ID / Order ID</strong> to unlock lifetime access on this machine.
+            Enter your <strong>Lifetime License Key</strong> or your <strong>ZaloPay Transaction ID / Order ID</strong> to unlock lifetime access on this machine.
           </p>
 
           <div>
             <label className="block text-[11px] font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
-              Activation Code / MoMo Trans ID
+              Activation Code / ZaloPay Trans ID
             </label>
             <input
               type="text"
@@ -104,7 +104,7 @@ const RedeemLicenseModal: React.FC<RedeemLicenseModalProps> = ({ onClose, onSucc
                 setCode(e.target.value);
                 if (error) setError(null);
               }}
-              placeholder="e.g. KV-CAD-XXXXXXXX, 29481058204, or KV-ORD-..."
+              placeholder="e.g. KV-CAD-XXXXXXXX, ZP-..., or 240919_..."
               className="w-full px-3.5 py-2.5 rounded-xl font-mono bg-gray-50 dark:bg-[#16161a] border border-gray-200 dark:border-[#33333e] focus:border-blue-500 focus:outline-hidden text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400"
               autoFocus
             />
@@ -168,7 +168,6 @@ export const ExtensionsTab: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<ExtensionCategory>('all');
   const [filterInstalledOnly, setFilterInstalledOnly] = useState(false);
-  const [purchasingExt, setPurchasingExt] = useState<ExtensionManifest | null>(null);
   const [showRedeemModal, setShowRedeemModal] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
@@ -329,9 +328,9 @@ export const ExtensionsTab: React.FC = () => {
           </div>
         </div>
       ) : (
-        <div className="bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-indigo-500/10 dark:from-pink-950/40 dark:via-purple-950/30 dark:to-indigo-950/40 p-3 sm:px-4 sm:py-2.5 rounded-2xl border border-pink-300/80 dark:border-pink-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+        <div className="bg-gradient-to-r from-blue-600/10 via-indigo-600/10 to-blue-500/10 dark:from-blue-950/40 dark:via-indigo-950/30 dark:to-blue-950/40 p-3 sm:px-4 sm:py-2.5 rounded-2xl border border-blue-200/80 dark:border-blue-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#a50064] to-[#d82d8b] text-white flex items-center justify-center shadow-xs shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-600 to-[#0068ff] text-white flex items-center justify-center shadow-xs shrink-0">
               <Crown size={16} className="text-amber-300" />
             </div>
             <div>
@@ -339,7 +338,7 @@ export const ExtensionsTab: React.FC = () => {
                 <h4 className="font-bold text-xs text-gray-900 dark:text-gray-100 tracking-tight">
                   KV Files Pro — Lifetime All-Access Pass
                 </h4>
-                <span className="px-1.5 py-0.2 rounded-md bg-gradient-to-r from-[#d82d8b] to-[#a50064] text-white font-mono text-[9px] font-bold">
+                <span className="px-2 py-0.5 rounded-md bg-blue-600 text-white font-mono text-[10px] font-bold shadow-xs">
                   199.000 ₫
                 </span>
               </div>
@@ -361,7 +360,7 @@ export const ExtensionsTab: React.FC = () => {
             )}
             <button
               onClick={() => setShowProModal(true)}
-              className="px-3 py-1.5 bg-gradient-to-r from-[#a50064] to-[#d82d8b] hover:from-[#8a0053] hover:to-[#be2077] text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 active:scale-95"
+              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-600/25 transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
             >
               <Sparkles size={12} className="text-amber-200" />
               <span>Unlock Pro • 199.000 ₫</span>
@@ -479,8 +478,9 @@ export const ExtensionsTab: React.FC = () => {
                                 Licensed
                               </span>
                             ) : (
-                              <span className="px-1.5 py-0.2 rounded bg-pink-50 dark:bg-pink-950/70 text-[#d82d8b] dark:text-pink-400 font-bold text-[9px] border border-pink-200 dark:border-pink-900/50">
-                                {ext.price ? `${(ext.price / 1000).toFixed(0)}k ₫` : 'Paid'}
+                              <span className="px-1.5 py-0.2 rounded bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 font-bold text-[9px] border border-amber-200 dark:border-amber-900/50 flex items-center gap-0.5">
+                                <Crown size={9} />
+                                <span>PRO</span>
                               </span>
                             )
                           ) : (
@@ -498,31 +498,7 @@ export const ExtensionsTab: React.FC = () => {
 
                     {/* Right side actions */}
                     <div className="flex items-center gap-1 shrink-0">
-                      {isPaid && !isPurchased ? (
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => setPurchasingExt(ext)}
-                            className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-semibold shadow-2xs transition-all active:scale-95"
-                          >
-                            Buy {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(ext.price || 0)}
-                          </button>
-                          <button
-                            onClick={() => setShowProModal(true)}
-                            title="Unlock with Pro pass"
-                            className="px-2 py-1 bg-gradient-to-r from-[#a50064] to-[#d82d8b] hover:from-[#8a0053] hover:to-[#be2077] text-white rounded-lg text-[11px] font-semibold flex items-center gap-1 shadow-2xs transition-all active:scale-95"
-                          >
-                            <Crown size={11} />
-                            <span>Pro</span>
-                          </button>
-                          <button
-                            onClick={() => setShowRedeemModal(true)}
-                            title="Redeem code"
-                            className="p-1 text-gray-400 hover:text-blue-500 rounded-md transition-colors"
-                          >
-                            <KeyRound size={12} />
-                          </button>
-                        </div>
-                      ) : isInstalled ? (
+                      {isPaid && !isPurchased ? null : isInstalled ? (
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => toggleExtension(ext.id)}
@@ -604,15 +580,11 @@ export const ExtensionsTab: React.FC = () => {
         </div>
       </div>
 
-      {/* MoMo Payment Checkout Modal (Pro All-Access Bundle or Extension) */}
-      {(purchasingExt || showProModal) && (
-        <MoMoPaymentModal
-          extension={purchasingExt || undefined}
-          isProBundle={!purchasingExt || showProModal}
-          onClose={() => {
-            setPurchasingExt(null);
-            setShowProModal(false);
-          }}
+      {/* ZaloPay Payment Checkout Modal (Pro All-Access Lifetime Pass) */}
+      {showProModal && (
+        <ZaloPayPaymentModal
+          isProBundle={true}
+          onClose={() => setShowProModal(false)}
           onSuccess={() => fetchLicenses()}
         />
       )}

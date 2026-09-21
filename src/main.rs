@@ -29,6 +29,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    // Load .env file if present
+    let _ = dotenvy::dotenv();
+
     let config = Config::parse();
     info!("Starting KV Files v{}", env!("CARGO_PKG_VERSION"));
 
@@ -90,6 +93,7 @@ async fn shutdown_signal() {
         tokio::signal::ctrl_c()
             .await
             .expect("failed to install Ctrl+C handler");
+        tracing::info!("Received Ctrl+C (SIGINT) signal");
     };
 
     #[cfg(unix)]
@@ -98,6 +102,7 @@ async fn shutdown_signal() {
             .expect("failed to install signal handler")
             .recv()
             .await;
+        tracing::info!("Received SIGTERM signal");
     };
 
     #[cfg(not(unix))]

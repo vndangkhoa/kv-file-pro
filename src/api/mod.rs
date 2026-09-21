@@ -29,8 +29,8 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/v1/auth/setup", post(auth::initial_setup))
         .route("/api/v1/auth/login", post(auth::login))
         .route("/api/v1/auth/2fa/verify", post(auth::verify_2fa_login))
-        // MoMo IPN Webhook (server-to-server callback)
-        .route("/api/v1/payments/momo/ipn", post(payments::momo_ipn_webhook))
+        // ZaloPay Server-to-Server Callback Webhook
+        .route("/api/v1/payments/zalopay/callback", post(payments::zalopay_callback_webhook))
         // Public share endpoints
         .route("/api/v1/public/share/{token}", get(shares::get_public_share))
         .route("/api/v1/public/share/{token}/download", get(shares::download_public_share))
@@ -40,8 +40,8 @@ pub fn create_router(state: AppState) -> Router {
         .with_state(state.clone());
 
     let protected_router = Router::new()
-        // Extension Store & MoMo Payments
-        .route("/api/v1/payments/momo/create", post(payments::create_momo_payment))
+        // Extension Store & ZaloPay Payments
+        .route("/api/v1/payments/zalopay/create", post(payments::create_zalopay_payment))
         .route("/api/v1/payments/licenses", get(payments::get_user_licenses))
         .route("/api/v1/payments/licenses/activate", post(payments::activate_license_code))
         .route("/api/v1/payments/orders/{id}", get(payments::check_order_status))
