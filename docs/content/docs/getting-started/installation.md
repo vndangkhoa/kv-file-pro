@@ -16,7 +16,7 @@ Download native release binaries directly from GitHub Releases:
 
 ```bash
 # Example for Linux x86_64
-curl -L -o kv-file https://github.com/vndangkhoa/kv-file/releases/latest/download/kv-file-linux-amd64
+curl -L -o kv-file https://github.com/vndangkhoa/kv-file-pro/releases/latest/download/kv-file-linux-amd64
 chmod +x kv-file
 
 # Verify installation
@@ -42,8 +42,8 @@ If you prefer compiling directly on your target machine:
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/vndangkhoa/kv-file.git
-cd kv-file
+git clone https://github.com/vndangkhoa/kv-file-pro.git
+cd kv-file-pro
 
 # 2. Bundle the React single-page frontend
 cd web

@@ -1,6 +1,6 @@
 module ola-docs
 
-go 1.26.7
+go 1.22
 
 require (
 	github.com/colinwilson/lotusdocs v0.3.0 // indirect

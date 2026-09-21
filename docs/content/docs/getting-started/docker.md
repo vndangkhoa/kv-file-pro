@@ -6,17 +6,17 @@ weight: 130
 toc: true
 ---
 
-Deploying **kv-file** via Docker allows sandboxed operation, persistent volume mounting across host disks, and painless container updates.
+Deploying **KV FILE PRO** via Docker allows sandboxed operation, persistent volume mounting across host disks, and painless container updates.
 
 ---
 
 ## 1. Quick Start (Docker Run)
 
-Run kv-file with a single terminal command:
+Run KV FILE PRO with a single terminal command:
 
 ```bash
 docker run -d \
-  --name kv-file \
+  --name kv-file-pro \
   -p 8866:8866 \
   -v /opt/kv-file/data:/data \
   -v /mnt/storage:/storage \
@@ -24,9 +24,10 @@ docker run -d \
   -e KV_PORT=8866 \
   -e KV_DATA_DIR=/data \
   -e KV_STORAGE_ROOTS="storage:/storage" \
+  -e KV_LICENSE_KEY="KVPRO-..." \
   -e RUST_LOG=kv_file=info \
   --restart unless-stopped \
-  ghcr.io/vndangkhoa/kv-file:latest
+  ghcr.io/vndangkhoa/kv-file-pro:latest
 ```
 
 ---
@@ -39,9 +40,9 @@ Using `docker-compose.yml` provides repeatable, version-controlled infrastructur
 version: '3.8'
 
 services:
-  kv-file:
-    image: ghcr.io/vndangkhoa/kv-file:latest
-    container_name: kv-file
+  kv-file-pro:
+    image: ghcr.io/vndangkhoa/kv-file-pro:latest
+    container_name: kv-file-pro
     ports:
       - "8866:8866"
     environment:
@@ -49,6 +50,7 @@ services:
       - KV_PORT=8866
       - KV_DATA_DIR=/data
       - KV_STORAGE_ROOTS=photos:/storage/photos:documents:/storage/docs:backups:/storage/backups
+      - KV_LICENSE_KEY=KVPRO-...
       - RUST_LOG=kv_file=info
     volumes:
       # Persistent SQLite database, sessions, and trash
@@ -71,7 +73,7 @@ services:
 docker compose up -d
 
 # Inspect live container logs
-docker compose logs -f kv-file
+docker compose logs -f kv-file-pro
 
 # Check container health status
 docker compose ps

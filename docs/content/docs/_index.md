@@ -1,25 +1,25 @@
 ---
-title: "Documentation"
-description: "High-performance self-hosted file manager with Windows Explorer and macOS Miller Columns UI"
+title: "KV FILE PRO Documentation"
+description: "Military-grade self-hosted web file manager, studio workspace & CAD/BIM viewport with macOS Miller Columns and Windows Explorer UI"
 icon: "article"
 toc: true
 weight: 10
 ---
 
-**kv-file** is a high-performance, single-binary, self-hosted web file manager built with a **Rust (Axum + Tokio)** backend and a **React + Tailwind CSS** frontend. It seamlessly unites the familiar hierarchical directory tree and path navigation of **Windows Explorer** with the cascading **Miller Columns** and **Quick Look** of **macOS Finder**.
+**KV FILE PRO** (`kv-file-pro` v2.1.0) is a military-grade, ultra-fast commercial and enterprise web file manager & studio workspace built with a **Rust (Axum + Tokio)** backend, embedded SQLite WAL, and a **React + Tailwind CSS** frontend. It seamlessly unites the familiar hierarchical directory tree of **Windows Explorer** with cascading **macOS Miller Columns**, integrated **3D CAD/BIM** viewports, **Adobe Creative Suite** studios, and **offline Ed25519 asymmetric licensing**.
 
 {{< alert context="info" >}}
-Looking for the product overview and interactive showcases? Visit the **[kv-file Official Website →](https://vndangkhoa.github.io/kv-file/?ref=docs_overview)**
+Looking for the interactive showcases, live demos, and deployment guides? Visit the **[KV FILE PRO Official Website →](https://vndangkhoa.github.io/kv-file-pro/?ref=docs_overview)**
 {{< /alert >}}
 
-kv-file delivers full feature parity with **FileBrowser Quantum** while introducing next-generation capabilities: real-time kernel filesystem watching, instant soft-delete trash restoration, zero-copy HTTP Range video seeking, and an integrated Command Palette (`Ctrl+K`).
+KV FILE PRO delivers bare-metal performance while introducing next-generation capabilities: real-time Linux kernel filesystem watching (`inotify`), instant soft-delete trash restoration, zero-copy HTTP Range video seeking, 3D CAD sectioning, and an integrated Command Palette (`Ctrl+K`).
 
 ---
 
 ## 🧭 Documentation Map
 
 <div class="row mt-4">
-  <div class="col-md-6 mb-3">
+  <div class="col-md-4 mb-3">
     <div class="card p-3 h-100 border">
       <div class="d-flex align-items-center mb-2">
         <i class="material-icons text-primary me-2">rocket_launch</i>
@@ -29,7 +29,7 @@ kv-file delivers full feature parity with **FileBrowser Quantum** while introduc
       <a href="getting-started/" class="btn btn-sm btn-primary">Get Started &rarr;</a>
     </div>
   </div>
-  <div class="col-md-6 mb-3">
+  <div class="col-md-4 mb-3">
     <div class="card p-3 h-100 border">
       <div class="d-flex align-items-center mb-2">
         <i class="material-icons text-primary me-2">diamond</i>
@@ -37,6 +37,16 @@ kv-file delivers full feature parity with **FileBrowser Quantum** while introduc
       </div>
       <p class="text-muted small mb-3">macOS Miller Columns, Windows Explorer table, Spacebar Quick Look, Split View, Download Manager, 2FA, and Inotify sync.</p>
       <a href="features/" class="btn btn-sm btn-primary">Explore Features &rarr;</a>
+    </div>
+  </div>
+  <div class="col-md-4 mb-3">
+    <div class="card p-3 h-100 border">
+      <div class="d-flex align-items-center mb-2">
+        <i class="material-icons text-warning me-2">military_tech</i>
+        <h5 class="mb-0">PRO Studios & License</h5>
+      </div>
+      <p class="text-muted small mb-3">CAD/BIM 3D Viewport (DWG/IFC/STEP), Adobe Studio (PSD/AI/XD), Typography, SysVis Animator, and Ed25519 offline licensing.</p>
+      <a href="features/pro-extensions-and-licensing/" class="btn btn-sm btn-warning text-dark font-weight-bold">PRO Studios &rarr;</a>
     </div>
   </div>
   <div class="col-md-6 mb-3">

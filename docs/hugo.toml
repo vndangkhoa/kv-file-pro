@@ -1,5 +1,5 @@
 baseURL = "/"
-title = "kv-file Documentation"
+title = "KV FILE PRO Documentation"
 contentDir = "content"
 enableEmoji = true
 
@@ -28,16 +28,16 @@ enableEmoji = true
   secondary_font  = "'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', sans-serif"
   mono_font       = "'Fira Code', monospace"
 
-  website         = "https://vndangkhoa.github.io/kv-file/"
+  website         = "https://vndangkhoa.github.io/kv-file-pro/"
 
   [params.footer]
-    copyright = "© :YEAR: kv-file. Built with [**Lotus Docs**](https://lotusdocs.dev)."
+    copyright = "© :YEAR: KV FILE PRO. Built with [**Lotus Docs**](https://lotusdocs.dev)."
 
   [params.social]
-    github = "https://github.com/vndangkhoa/kv-file"
+    github = "https://github.com/vndangkhoa/kv-file-pro"
 
   [params.docs]
-    title           = "kv-file Documentation"
+    title           = "KV FILE PRO Documentation"
     themeColor      = "blue"
     darkMode        = true
     sidebarIcons    = true
@@ -57,7 +57,7 @@ enableEmoji = true
 [menu]
 [[menu.primary]]
   name = "Website"
-  url = "https://vndangkhoa.github.io/kv-file/"
+  url = "https://vndangkhoa.github.io/kv-file-pro/"
   weight = 5
 [[menu.primary]]
   name = "Docs"
@@ -65,5 +65,5 @@ enableEmoji = true
   weight = 10
 [[menu.primary]]
   name = "GitHub"
-  url = "https://github.com/vndangkhoa/kv-file"
+  url = "https://github.com/vndangkhoa/kv-file-pro"
   weight = 20
