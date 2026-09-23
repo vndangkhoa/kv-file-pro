@@ -356,3 +356,120 @@ async fn test_live_zalopay_production_create_order() {
         }
     }
 }
+
+#[tokio::test]
+async fn test_admin_approve_verification_guard() {
+    use axum::extract::{Path, State};
+    use axum::{Extension, Json};
+    use kv_files::api::payments::admin_approve_order;
+    use kv_files::fs::sandbox::RootManager;
+    use kv_files::models::{AdminOrderActionRequest, User};
+    use kv_files::state::AppState;
+    use tokio::sync::broadcast;
+
+    let temp_db = std::env::temp_dir().join(format!("kv_guard_test_{}.db", uuid::Uuid::new_v4()));
+    let db = Database::new(&temp_db).unwrap();
+    let root_mgr = RootManager::new(vec![]).unwrap();
+    let (tx, _) = broadcast::channel(100);
+    let app_state = AppState::new(db.clone(), root_mgr, tx);
+
+    let admin_user = User {
+        id: "admin-1".into(),
+        username: "admin".into(),
+        role: "admin".into(),
+        created_at: chrono::Utc::now().to_rfc3339(),
+        is_totp_enabled: false,
+    };
+
+    let regular_user = User {
+        id: "user-1".into(),
+        username: "user".into(),
+        role: "user".into(),
+        created_at: chrono::Utc::now().to_rfc3339(),
+        is_totp_enabled: false,
+    };
+
+    let order_id = format!("KV-ORD-{}", uuid::Uuid::new_v4());
+    let order = ExtensionOrder {
+        id: order_id.clone(),
+        user_id: regular_user.id.clone(),
+        extension_id: "cad-viewer".into(),
+        amount: 99000,
+        status: "AWAITING_VERIFICATION".to_string(),
+        gateway_trans_id: Some("260923_mock_unpaid_123456".to_string()),
+        user_note: Some("User says paid".into()),
+        payment_method: Some("ZALOPAY_SANDBOX".to_string()),
+        created_at: chrono::Utc::now().to_rfc3339(),
+        updated_at: chrono::Utc::now().to_rfc3339(),
+    };
+    db.create_extension_order(&order).await.unwrap();
+
+    // 1. Regular non-admin user cannot approve
+    let non_admin_res = admin_approve_order(
+        State(app_state.clone()),
+        Extension(regular_user.clone()),
+        Path(order_id.clone()),
+        Json(AdminOrderActionRequest {
+            note: None,
+            force_manual: None,
+        }),
+    )
+    .await;
+    assert!(non_admin_res.is_err(), "Non-admin user cannot approve orders");
+
+    // 2. Admin cannot approve unpaid order without confirmed gateway payment
+    let unpaid_res = admin_approve_order(
+        State(app_state.clone()),
+        Extension(admin_user.clone()),
+        Path(order_id.clone()),
+        Json(AdminOrderActionRequest {
+            note: Some("Approve without verification".into()),
+            force_manual: None,
+        }),
+    )
+    .await;
+    assert!(
+        unpaid_res.is_err(),
+        "Must reject approval without confirmed gateway verification"
+    );
+
+    // 3. force_manual without adequate note (< 5 chars) fails
+    let force_empty_res = admin_approve_order(
+        State(app_state.clone()),
+        Extension(admin_user.clone()),
+        Path(order_id.clone()),
+        Json(AdminOrderActionRequest {
+            note: Some("ok".into()),
+            force_manual: Some(true),
+        }),
+    )
+    .await;
+    assert!(
+        force_empty_res.is_err(),
+        "Must require >= 5 char audit note for manual override"
+    );
+
+    // 4. force_manual with valid audit note succeeds
+    let force_valid_res = admin_approve_order(
+        State(app_state.clone()),
+        Extension(admin_user.clone()),
+        Path(order_id.clone()),
+        Json(AdminOrderActionRequest {
+            note: Some("Verified in bank statement ref #12345678".into()),
+            force_manual: Some(true),
+        }),
+    )
+    .await;
+    assert!(force_valid_res.is_ok(), "Valid manual override must succeed");
+
+    let paid_order = db.get_extension_order(&order_id).await.unwrap().unwrap();
+    assert_eq!(paid_order.status, "PAID");
+
+    let has_lic = db
+        .has_extension_license(&regular_user.id, "cad-viewer")
+        .await
+        .unwrap();
+    assert!(has_lic, "License must be granted upon valid approval");
+
+    let _ = std::fs::remove_file(temp_db);
+}

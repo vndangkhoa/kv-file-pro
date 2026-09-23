@@ -727,8 +727,8 @@ pub async fn check_order_status(
         return Err(AppError::Forbidden("You do not have permission to view this order".into()));
     }
 
-    // If order is PENDING, query ZaloPay in real-time to check if payment was completed
-    if order.status == "PENDING" {
+    // If order is PENDING or AWAITING_VERIFICATION, query ZaloPay in real-time to check if payment was completed
+    if order.status == "PENDING" || order.status == "AWAITING_VERIFICATION" {
         if let Some(trans_id) = order.gateway_trans_id.as_deref() {
             if let Some(query_resp) = query_zalopay_order_status(trans_id).await {
                 if query_resp.return_code == 1 {
@@ -951,12 +951,56 @@ pub async fn admin_approve_order(
         }));
     }
 
-    let trans_id = format!("ADMIN-CONFIRM-{}", chrono::Utc::now().timestamp_millis());
-    let gateway_trans_id = order.gateway_trans_id.as_deref().unwrap_or(&trans_id);
+    let verified_trans_id = if payload.force_manual == Some(true) {
+        let note = payload.note.as_deref().unwrap_or("").trim();
+        if note.len() < 5 {
+            return Err(AppError::BadRequest(
+                "Manual override requires a verification note explaining the bank transfer proof (at least 5 characters).".into(),
+            ));
+        }
+        format!("MANUAL-ADMIN-{}-{}", user.username, chrono::Utc::now().timestamp_millis())
+    } else {
+        let trans_id = order.gateway_trans_id.as_deref().ok_or_else(|| {
+            AppError::BadRequest(
+                "Cannot approve order: No gateway transaction ID found. To manually approve offline transfers, specify manual override with transaction proof note.".into(),
+            )
+        })?;
+
+        match query_zalopay_order_status(trans_id).await {
+            Some(resp) if resp.return_code == 1 => {
+                resp.zp_trans_id
+                    .map(|t| t.to_string())
+                    .unwrap_or_else(|| trans_id.to_string())
+            }
+            Some(resp) if resp.return_code == 2 => {
+                return Err(AppError::BadRequest(format!(
+                    "Cannot approve order: ZaloPay reports transaction failed (Code 2: {}).",
+                    resp.return_message
+                )));
+            }
+            Some(resp) if resp.return_code == 3 => {
+                return Err(AppError::BadRequest(format!(
+                    "Cannot approve order: ZaloPay payment gateway reports that the order has NOT been paid yet (Code 3: {}). User must complete transfer before license can be issued.",
+                    resp.return_message
+                )));
+            }
+            Some(resp) => {
+                return Err(AppError::BadRequest(format!(
+                    "Cannot approve order: ZaloPay reported unverified status (Code {}: {}).",
+                    resp.return_code, resp.return_message
+                )));
+            }
+            None => {
+                return Err(AppError::BadRequest(
+                    "Unable to verify payment status with ZaloPay gateway. Please check gateway network connectivity or use manual bank statement override with verified bank transfer proof.".into(),
+                ));
+            }
+        }
+    };
 
     state
         .db
-        .update_order_status(&order.id, "PAID", Some(gateway_trans_id))
+        .update_order_status(&order.id, "PAID", Some(&verified_trans_id))
         .await?;
 
     let signing_secret = state
@@ -1077,8 +1121,7 @@ pub async fn dev_simulate_payment(
         ));
     }
 
-    let is_debug = cfg!(debug_assertions);
-    if user.role != "admin" && !dev_enabled && !is_debug && !is_test_order {
+    if user.role != "admin" && !dev_enabled && !is_test_order {
         return Err(AppError::Forbidden(
             "Developer payment simulator requires admin permissions, sandbox mode, or KV_ENABLE_DEV_PAYMENT=true.".into(),
         ));

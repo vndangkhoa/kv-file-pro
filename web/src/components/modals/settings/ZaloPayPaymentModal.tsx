@@ -5,16 +5,14 @@ import {
   AlertCircle,
   Loader2,
   Smartphone,
-  ShieldCheck,
   Copy,
   Check,
   KeyRound,
   Clock,
-  Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 import { ExtensionManifest, PaymentCreateResponse, PRO_BUNDLE_ID, PRO_BUNDLE_PRICE } from '../../../types';
 import { useExtensionStore } from '../../../stores/useExtensionStore';
-import { useAuthStore } from '../../../stores/useAuthStore';
 
 interface ZaloPayPaymentModalProps {
   extension?: ExtensionManifest;
@@ -30,8 +28,6 @@ export const ZaloPayPaymentModal: React.FC<ZaloPayPaymentModalProps> = ({
   onSuccess,
 }) => {
   const { markExtensionPurchased, unlockProLifetime, isProLicensed, proLicenseKey, fetchLicenses } = useExtensionStore();
-  const user = useAuthStore((s) => s.user);
-  const isAdmin = user?.role === 'admin';
 
   const isPro = isProBundle || !extension || extension.id === PRO_BUNDLE_ID;
   const targetId = isPro ? PRO_BUNDLE_ID : extension.id;
@@ -45,13 +41,13 @@ export const ZaloPayPaymentModal: React.FC<ZaloPayPaymentModalProps> = ({
   const [orderStatus, setOrderStatus] = useState<'PENDING' | 'AWAITING_VERIFICATION' | 'PAID' | 'FAILED' | 'CANCELLED'>('PENDING');
   const [isPolling, setIsPolling] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [isAdminApproving, setIsAdminApproving] = useState(false);
   const [isSubmittingTransfer, setIsSubmittingTransfer] = useState(false);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [verificationFeedback, setVerificationFeedback] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [issuedLicenseKey, setIssuedLicenseKey] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState(false);
   const [userNote, setUserNote] = useState('');
-  const [isSimulating, setIsSimulating] = useState(false);
 
   // Safely resolve QR URL with Vite base URL for subpath and offline resilience
   const resolveQrUrl = (url?: string) => {
@@ -190,65 +186,43 @@ export const ZaloPayPaymentModal: React.FC<ZaloPayPaymentModalProps> = ({
     }
   };
 
-  // Admin instant approval
-  const handleAdminApprove = async () => {
-    if (!paymentData?.order_id || !isAdmin) return;
-    try {
-      setIsAdminApproving(true);
-      const res = await fetch(`/api/v1/payments/admin/orders/${paymentData.order_id}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ note: 'Admin verified via checkout modal' }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setIsPolling(false);
-        handlePaymentSuccess(data.license_key);
-      } else {
-        const err = await res.json().catch(() => ({}));
-        alert(err.error || err.message || 'Admin approval failed');
-      }
-    } catch (e) {
-      console.error(e);
-      alert('Network error during admin approval');
-    } finally {
-      setIsAdminApproving(false);
-    }
-  };
-
-  // Developer / Sandbox instant simulator
-  const handleSimulatePayment = async () => {
+  // Re-verify payment status with gateway in real time
+  const handleRecheckPaymentStatus = async () => {
     if (!paymentData?.order_id) return;
     try {
-      setIsSimulating(true);
-      const res = await fetch(`/api/v1/payments/dev/simulate/${paymentData.order_id}`, {
-        method: 'POST',
+      setIsCheckingStatus(true);
+      setVerificationFeedback(null);
+      const res = await fetch(`/api/v1/payments/orders/${paymentData.order_id}`, {
         credentials: 'include',
       });
       if (res.ok) {
         const data = await res.json();
-        setIsPolling(false);
-        handlePaymentSuccess(data.license_key);
-      } else {
-        const err = await res.json().catch(() => ({}));
-        alert(err.error || err.message || 'Simulation failed');
+        if (data.status === 'PAID') {
+          setIsPolling(false);
+          handlePaymentSuccess(data.license_key);
+          return;
+        } else if (data.status === 'FAILED') {
+          setVerificationFeedback('Giao dịch thanh toán đã thất bại hoặc bị hủy.');
+        } else {
+          setVerificationFeedback('Hệ thống chưa ghi nhận tiền về tài khoản. Vui lòng hoàn tất chuyển khoản bằng app ngân hàng.');
+        }
       }
-    } catch (e: any) {
-      alert(e.message || 'Simulation network error');
+    } catch {
+      setVerificationFeedback('Không thể kết nối đến máy chủ kiểm tra thanh toán.');
     } finally {
-      setIsSimulating(false);
+      setIsCheckingStatus(false);
     }
   };
 
   // Confirm transfer submitted
   const handleConfirmTransfer = async () => {
     if (!paymentData?.order_id) {
-      alert('Đã ghi nhận yêu cầu. Vui lòng quét mã QR hoặc liên hệ quản trị viên với mã đơn để nhận bản quyền!');
+      alert('Đã ghi nhận yêu cầu. Vui lòng quét mã QR để chuyển khoản thanh toán!');
       return;
     }
     try {
       setIsSubmittingTransfer(true);
+      setVerificationFeedback(null);
       const notePayload = userNote.trim()
         ? `User confirmed: ${userNote.trim()}`
         : 'User confirmed payment via ZaloPay / VietQR';
@@ -263,6 +237,18 @@ export const ZaloPayPaymentModal: React.FC<ZaloPayPaymentModalProps> = ({
       });
       if (res.ok) {
         setOrderStatus('AWAITING_VERIFICATION');
+        // Immediately query gateway to verify if funds arrived
+        const statusRes = await fetch(`/api/v1/payments/orders/${paymentData.order_id}`, {
+          credentials: 'include',
+        });
+        if (statusRes.ok) {
+          const statusData = await statusRes.json();
+          if (statusData.status === 'PAID') {
+            setIsPolling(false);
+            handlePaymentSuccess(statusData.license_key);
+            return;
+          }
+        }
       } else {
         const err = await res.json().catch(() => ({}));
         alert(err.error || err.message || 'Failed to submit transfer confirmation');
@@ -458,38 +444,27 @@ export const ZaloPayPaymentModal: React.FC<ZaloPayPaymentModalProps> = ({
                 </div>
               </div>
 
-              {/* Sandbox Instant Unlock Button */}
-              {(paymentData?.is_test_mode || paymentData?.is_mock || isAdmin) && (
-                <button
-                  type="button"
-                  onClick={handleSimulatePayment}
-                  disabled={isSimulating}
-                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                >
-                  {isSimulating ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
-                  <span>Instant Test Unlock (Simulator)</span>
-                </button>
-              )}
-
-              {/* Admin Quick Action if current user is Host Admin */}
-              {isAdmin && (
-                <div className="w-full p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 rounded-xl text-left space-y-2">
-                  <div className="flex items-center justify-between text-[11px] text-blue-800 dark:text-blue-300 font-semibold">
-                    <span>Host Admin Action:</span>
-                    <span className="text-[10px] bg-blue-200 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded-full font-mono">
-                      Admin
-                    </span>
+              {verificationFeedback && (
+                <div className="w-full p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-left text-xs text-amber-800 dark:text-amber-200 space-y-1">
+                  <div className="flex items-center gap-1.5 font-semibold">
+                    <AlertCircle size={14} className="text-amber-600 shrink-0" />
+                    <span>Thông báo kiểm tra thanh toán:</span>
                   </div>
-                  <button
-                    onClick={handleAdminApprove}
-                    disabled={isAdminApproving}
-                    className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs flex items-center justify-center gap-1.5 transition-all"
-                  >
-                    {isAdminApproving ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
-                    <span>Confirm & Issue License (Admin)</span>
-                  </button>
+                  <p className="text-[11px] leading-relaxed text-amber-700 dark:text-amber-300">
+                    {verificationFeedback}
+                  </p>
                 </div>
               )}
+
+              <button
+                type="button"
+                onClick={handleRecheckPaymentStatus}
+                disabled={isCheckingStatus}
+                className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              >
+                {isCheckingStatus ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                <span>Kiểm tra lại trạng thái thanh toán (ZaloPay)</span>
+              </button>
 
               <div className="flex items-center gap-2 w-full pt-1">
                 <button
@@ -608,30 +583,7 @@ export const ZaloPayPaymentModal: React.FC<ZaloPayPaymentModalProps> = ({
                   <span>Tôi đã chuyển khoản / Xác nhận thanh toán</span>
                 </button>
 
-                {/* Developer / Sandbox Instant Simulator */}
-                {(paymentData?.is_test_mode || paymentData?.is_mock || isAdmin) && (
-                  <button
-                    type="button"
-                    onClick={handleSimulatePayment}
-                    disabled={isSimulating}
-                    className="w-full py-2 px-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-300/60 dark:border-amber-700/60 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                  >
-                    {isSimulating ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
-                    <span>Kích hoạt thử nghiệm ngay (Sandbox Mode)</span>
-                  </button>
-                )}
 
-                {/* Admin Quick Action */}
-                {isAdmin && (
-                  <button
-                    onClick={handleAdminApprove}
-                    disabled={isAdminApproving}
-                    className="w-full py-2 px-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 text-blue-600 dark:text-blue-400 hover:bg-blue-100 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                  >
-                    {isAdminApproving ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
-                    <span>Admin Instant Approve & Unlock</span>
-                  </button>
-                )}
 
                 <button
                   onClick={handleCancelOrder}

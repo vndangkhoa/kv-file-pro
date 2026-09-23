@@ -74,21 +74,26 @@ export const AdminOrdersModal: React.FC<AdminOrdersModalProps> = ({ onClose }) =
     fetchOrders();
   }, [fetchOrders]);
 
-  const handleApprove = async (orderId: string) => {
+  const handleApprove = async (orderId: string, forceManual = false, overrideNote?: string) => {
     try {
       setActionInProgress(orderId);
       setError(null);
+
+      const payload: { note?: string; force_manual?: boolean } = {
+        note: overrideNote || 'Verified and approved by Administrator',
+        force_manual: forceManual,
+      };
 
       const res = await fetch(`/api/v1/payments/admin/orders/${encodeURIComponent(orderId)}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ note: 'Manually verified and approved by Administrator' }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Failed to approve order');
+        throw new Error(errData.error || errData.message || 'Failed to approve order');
       }
 
       const updatedOrder: OrderStatusResponse = await res.json();
@@ -104,6 +109,46 @@ export const AdminOrdersModal: React.FC<AdminOrdersModalProps> = ({ onClose }) =
       fetchLicenses();
     } catch (err: any) {
       setError(err.message || 'Error approving order');
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  const handleManualOverride = async (orderId: string) => {
+    const note = window.prompt(
+      'MANUAL BANK OVERRIDE:\nEnter verified bank statement transaction reference (at least 5 characters):',
+      ''
+    );
+    if (note === null) return;
+    if (note.trim().length < 5) {
+      alert('Verification note must be at least 5 characters (e.g. Bank transfer ref #12345).');
+      return;
+    }
+    await handleApprove(orderId, true, `Manual bank statement verified: ${note.trim()}`);
+  };
+
+  const handleVerifyGateway = async (orderId: string) => {
+    try {
+      setActionInProgress(`verify-${orderId}`);
+      setError(null);
+      const res = await fetch(`/api/v1/payments/orders/${encodeURIComponent(orderId)}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        throw new Error('Failed to query order from gateway');
+      }
+      const data: OrderStatusResponse = await res.json();
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, ...data } : o))
+      );
+      if (data.status === 'PAID') {
+        setActionSuccess(`Order ${orderId} verified as PAID by ZaloPay gateway! License issued.`);
+        fetchLicenses();
+      } else {
+        setError(`Gateway status for ${orderId}: ${data.status}. Payment has NOT been completed at ZaloPay.`);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to verify with gateway');
     } finally {
       setActionInProgress(null);
     }
@@ -416,20 +461,46 @@ export const AdminOrdersModal: React.FC<AdminOrdersModalProps> = ({ onClose }) =
                   </div>
 
                   {/* Right Actions */}
-                  <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                  <div className="flex flex-wrap items-center gap-1.5 shrink-0 self-end md:self-center">
                     {(order.status === 'AWAITING_VERIFICATION' || order.status === 'PENDING') && (
                       <>
                         <button
+                          type="button"
+                          onClick={() => handleVerifyGateway(order.id)}
+                          disabled={actionInProgress === `verify-${order.id}` || isActioning}
+                          className="px-2.5 py-1.5 rounded-xl border border-blue-200 dark:border-blue-900/60 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 text-xs font-medium transition-colors disabled:opacity-50 flex items-center gap-1"
+                          title="Check real-time payment status directly with ZaloPay gateway"
+                        >
+                          {actionInProgress === `verify-${order.id}` ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : (
+                            <RefreshCw size={12} />
+                          )}
+                          <span>Check Gateway</span>
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleReject(order.id)}
                           disabled={isActioning}
-                          className="px-3 py-1.5 rounded-xl border border-red-200 dark:border-red-900/60 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 text-xs font-medium transition-colors disabled:opacity-50"
+                          className="px-2.5 py-1.5 rounded-xl border border-red-200 dark:border-red-900/60 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 text-xs font-medium transition-colors disabled:opacity-50"
                         >
                           Reject
                         </button>
                         <button
+                          type="button"
+                          onClick={() => handleManualOverride(order.id)}
+                          disabled={isActioning}
+                          className="px-2.5 py-1.5 rounded-xl border border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30 text-xs font-medium transition-colors disabled:opacity-50"
+                          title="Manual bank override (requires bank transaction reference note)"
+                        >
+                          Manual Override
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleApprove(order.id)}
                           disabled={isActioning}
-                          className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-all flex items-center gap-1.5 disabled:opacity-50"
+                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-all flex items-center gap-1.5 disabled:opacity-50"
+                          title="Verify payment with ZaloPay gateway and issue license"
                         >
                           {isActioning ? (
                             <Loader2 size={13} className="animate-spin" />

@@ -186,6 +186,7 @@ pub struct SubmitTransferRequest {
 #[derive(Debug, Clone, Deserialize)]
 pub struct AdminOrderActionRequest {
     pub note: Option<String>,
+    pub force_manual: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
