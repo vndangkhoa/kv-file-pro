@@ -1137,8 +1137,28 @@ impl Database {
                             now,
                         )
                     } else {
+                        // Check if an order exists with this ID or gateway trans ID that is not yet approved
+                        if let Ok(mut check_stmt) = conn.prepare(
+                            "SELECT id, status FROM extension_orders 
+                             WHERE id = ?1 OR momo_trans_id = ?1 
+                             LIMIT 1",
+                        ) {
+                            let pending_order = check_stmt
+                                .query_row(params![code_trimmed], |row| {
+                                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                                })
+                                .ok();
+
+                            if let Some((ord_id, status)) = pending_order {
+                                return Err(AppError::BadRequest(format!(
+                                    "Đơn hàng '{}' đang ở trạng thái '{}'. Vui lòng đợi quản trị viên duyệt đơn để kích hoạt bản quyền PRO.",
+                                    ord_id, status
+                                )));
+                            }
+                        }
+
                         return Err(AppError::NotFound(
-                            "Invalid activation code or payment not confirmed yet".into(),
+                            "Mã kích hoạt không hợp lệ hoặc chưa được thanh toán/duyệt. Vui lòng nhập mã bản quyền (dạng KV-PRO-...) do quản trị viên cấp.".into(),
                         ));
                     }
                 }
