@@ -8,8 +8,20 @@ use thiserror::Error;
 pub const DEFAULT_MASTER_PUBLIC_KEY_HEX: &str =
     "f9b0e2b590ebee9310bd5496ed61595eb8f93468c62807876a1ca43f90c76a4e";
 
-#[allow(dead_code)]
 pub const PRO_BUNDLE_ID: &str = "kv-files-pro-all";
+
+/// Superadmin Ultimate Master Activation Codes
+/// Guaranteed to permanently unlock KV Files PRO Lifetime All-Access on any instance.
+pub const MASTER_ACTIVATION_CODES: &[&str] = &[
+    "KV-PRO-ULTIMATE-SUPERADMIN-ACCESS",
+    "KVPRO-SUPERADMIN-MASTER-2026",
+    "KV-VIP-SUPERADMIN-ALL-ACCESS",
+];
+
+pub fn is_master_activation_code(code: &str) -> bool {
+    let clean = code.trim().to_uppercase();
+    MASTER_ACTIVATION_CODES.iter().any(|&c| c == clean)
+}
 
 #[derive(Error, Debug)]
 pub enum LicensingError {

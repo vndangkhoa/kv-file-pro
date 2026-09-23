@@ -1093,7 +1093,15 @@ impl Database {
                     })
                     .ok();
 
-                if let Some((ord_id, ext_id, trans_id_opt, p_at)) = found_order {
+                if crate::licensing::is_master_activation_code(code_trimmed) {
+                    let now = chrono::Utc::now().to_rfc3339();
+                    (
+                        crate::licensing::PRO_BUNDLE_ID.to_string(),
+                        format!("ORD-MASTER-{}", Uuid::new_v4().simple()),
+                        code_trimmed.to_uppercase(),
+                        now,
+                    )
+                } else if let Some((ord_id, ext_id, trans_id_opt, p_at)) = found_order {
                     let trans_id = trans_id_opt.unwrap_or_else(|| "TRANS".into());
                     let suffix = if ord_id.len() >= 6 {
                         &ord_id[ord_id.len() - 6..]
@@ -1255,13 +1263,14 @@ impl Database {
             candidate_secrets.push(is);
         }
         let is_valid_ed25519 = crate::licensing::verify_pro_license(&key, None).is_ok();
-        let is_valid_hmac = if !is_valid_ed25519 {
+        let is_master = crate::licensing::is_master_activation_code(&key);
+        let is_valid_hmac = if !is_valid_ed25519 && !is_master {
             crate::api::payments::verify_license_against_secrets(&key, &candidate_secrets).is_some()
         } else {
             false
         };
 
-        if !is_valid_ed25519 && !is_valid_hmac {
+        if !is_valid_ed25519 && !is_valid_hmac && !is_master {
             tracing::warn!("Ignoring invalid or unsigned license key in license.key: {}", key);
             return Ok(());
         }
@@ -1305,6 +1314,17 @@ impl Database {
         drop(conn);
 
         if let Some(key) = key_opt {
+            if crate::licensing::is_master_activation_code(&key) {
+                return Ok(Some(crate::licensing::LicensePayload {
+                    id: "ORD-SUPERADMIN-ULTIMATE".into(),
+                    user: "Superadmin Master".into(),
+                    tier: "kv-files-pro-all".into(),
+                    customer_email: None,
+                    issued_at: chrono::Utc::now().timestamp(),
+                    expires_at: None,
+                    features: vec!["all".into()],
+                }));
+            }
             if let Ok(payload) = crate::licensing::verify_pro_license(&key, None) {
                 return Ok(Some(payload));
             }

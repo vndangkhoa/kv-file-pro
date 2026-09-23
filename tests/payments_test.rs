@@ -473,3 +473,66 @@ async fn test_admin_approve_verification_guard() {
 
     let _ = std::fs::remove_file(temp_db);
 }
+
+#[tokio::test]
+async fn test_superadmin_ultimate_master_code_activation() {
+    use kv_files::db::Database;
+
+    let temp_db = std::env::temp_dir().join(format!("kv_ultimate_test_{}.db", uuid::Uuid::new_v4()));
+    let db = Database::new(&temp_db).unwrap();
+
+    let user = db.create_user("customer_vip", "pass123", "user").await.unwrap();
+
+    // 1. Initial state: user has no license
+    assert!(!db.has_extension_license(&user.id, "kv-files-pro-all").await.unwrap());
+    assert!(!db.has_extension_license(&user.id, "cad-viewer").await.unwrap());
+
+    // 2. User activates using Superadmin Ultimate Master Code
+    let res = db
+        .activate_extension_license_for_user(&user.id, "KV-PRO-ULTIMATE-SUPERADMIN-ACCESS")
+        .await;
+    assert!(res.is_ok(), "Redeeming ultimate master code must succeed: {:?}", res.err());
+    let license = res.unwrap();
+    assert_eq!(license.extension_id, "kv-files-pro-all");
+    assert_eq!(license.license_key, "KV-PRO-ULTIMATE-SUPERADMIN-ACCESS");
+
+    // 3. User now has full PRO bundle and all sub-extensions
+    assert!(db.has_extension_license(&user.id, "kv-files-pro-all").await.unwrap());
+    assert!(db.has_extension_license(&user.id, "cad-viewer").await.unwrap());
+    assert!(db.has_extension_license(&user.id, "adobe-suite-viewer").await.unwrap());
+
+    // 4. System-wide Pro license is active
+    let sys_pro = db.get_system_pro_license().await.unwrap();
+    assert!(sys_pro.is_some(), "System Pro license must be active");
+    assert_eq!(sys_pro.unwrap().tier, "kv-files-pro-all");
+
+    // 5. Test alternate master code with lowercase
+    let user2 = db.create_user("customer_vip2", "pass123", "user").await.unwrap();
+    let res2 = db
+        .activate_extension_license_for_user(&user2.id, "kvpro-superadmin-master-2026")
+        .await;
+    assert!(res2.is_ok(), "Lowercase master code must also succeed");
+    assert!(db.has_extension_license(&user2.id, "kv-files-pro-all").await.unwrap());
+
+    // 6. Test cryptographic offline signed Ed25519 token
+    let priv_bytes = hex::decode("328cbd52260e870a3bce416049f8e97a55567a2c1e48db56f1f41aa6b12ee469").unwrap();
+    let mut priv_array = [0u8; 32];
+    priv_array.copy_from_slice(&priv_bytes);
+    let payload = kv_files::licensing::LicensePayload {
+        id: "KV-ORD-ED25519-MASTER".to_string(),
+        user: "vip_crypto".to_string(),
+        tier: kv_files::licensing::PRO_BUNDLE_ID.to_string(),
+        customer_email: None,
+        issued_at: chrono::Utc::now().timestamp(),
+        expires_at: None,
+        features: vec!["all".to_string()],
+    };
+    let crypto_token = kv_files::licensing::sign_license_payload(&payload, &priv_array).unwrap();
+    let user3 = db.create_user("customer_crypto", "pass123", "user").await.unwrap();
+    let res3 = db.activate_extension_license_for_user(&user3.id, &crypto_token).await;
+    assert!(res3.is_ok(), "Cryptographic signed token activation must succeed: {:?}", res3.err());
+    assert!(db.has_extension_license(&user3.id, "kv-files-pro-all").await.unwrap());
+    assert!(db.has_extension_license(&user3.id, "cad-viewer").await.unwrap());
+
+    let _ = std::fs::remove_file(temp_db);
+}
