@@ -974,13 +974,13 @@ pub async fn admin_approve_order(
             }
             Some(resp) if resp.return_code == 2 => {
                 return Err(AppError::BadRequest(format!(
-                    "Cannot approve order: ZaloPay reports transaction failed (Code 2: {}).",
+                    "Cannot approve order: ZaloPay reports transaction failed or expired (Code 2: {}). If payment was received via direct bank transfer (BVBank/VietQR), use Manual Override to approve.",
                     resp.return_message
                 )));
             }
             Some(resp) if resp.return_code == 3 => {
                 return Err(AppError::BadRequest(format!(
-                    "Cannot approve order: ZaloPay payment gateway reports that the order has NOT been paid yet (Code 3: {}). User must complete transfer before license can be issued.",
+                    "Cannot approve order: ZaloPay gateway reports order NOT yet paid online (Code 3: {}). If payment was received via direct bank transfer (BVBank/VietQR), use Manual Override to approve.",
                     resp.return_message
                 )));
             }

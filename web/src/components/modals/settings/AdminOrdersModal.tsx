@@ -93,7 +93,30 @@ export const AdminOrdersModal: React.FC<AdminOrdersModalProps> = ({ onClose }) =
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || errData.message || 'Failed to approve order');
+        const errMsg = errData.error || errData.message || 'Failed to approve order';
+
+        // If gateway verification failed/expired and admin clicked default Approve, prompt for bank receipt confirmation
+        if (
+          !forceManual &&
+          (errMsg.includes('Code 2') ||
+            errMsg.includes('Code 3') ||
+            errMsg.includes('ZaloPay') ||
+            errMsg.includes('failed or expired') ||
+            errMsg.includes('hết hạn'))
+        ) {
+          const confirmBankReceipt = window.confirm(
+            `⚠️ THÔNG BÁO TỪ CỔNG THANH TOÁN:\n${errMsg}\n\nLý do: Khách hàng thanh toán qua chuyển khoản ngân hàng / VietQR nên phiên ZaloPay online đã hết hạn hoặc không ghi nhận qua ZaloPay App.\n\n👉 Bạn có xác nhận ĐÃ NHẬN ĐƯỢC TIỀN trong tài khoản ngân hàng (BVBank) không?\n\n- Bấm [OK] để DUYỆT ĐƠN & CẤP BẢN QUYỀN PRO NGAY LẬP TỨC.\n- Bấm [Cancel] nếu muốn đóng thông báo.`
+          );
+          if (confirmBankReceipt) {
+            return await handleApprove(
+              orderId,
+              true,
+              `Quản trị viên đã kiểm tra và xác nhận nhận tiền thành công trong tài khoản ngân hàng (BVBank)`
+            );
+          }
+        }
+
+        throw new Error(errMsg);
       }
 
       const updatedOrder: OrderStatusResponse = await res.json();
@@ -116,12 +139,12 @@ export const AdminOrdersModal: React.FC<AdminOrdersModalProps> = ({ onClose }) =
 
   const handleManualOverride = async (orderId: string) => {
     const note = window.prompt(
-      'MANUAL BANK OVERRIDE:\nEnter verified bank statement transaction reference (at least 5 characters):',
-      ''
+      'MANUAL BANK OVERRIDE (DUYỆT CHUYỂN KHOẢN NGÂN HÀNG):\nNhập mã giao dịch ngân hàng hoặc ghi chú đối soát (tối thiểu 5 ký tự):',
+      'Đã nhận tiền qua BVBank'
     );
     if (note === null) return;
     if (note.trim().length < 5) {
-      alert('Verification note must be at least 5 characters (e.g. Bank transfer ref #12345).');
+      alert('Ghi chú xác nhận phải có ít nhất 5 ký tự (ví dụ: Đã nhận tiền qua BVBank).');
       return;
     }
     await handleApprove(orderId, true, `Manual bank statement verified: ${note.trim()}`);
