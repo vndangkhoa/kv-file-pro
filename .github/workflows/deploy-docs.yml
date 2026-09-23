@@ -62,13 +62,8 @@ jobs:
           mkdir -p site
           # 1. Copy Hugo documentation site (docs/, scss/, js/, index.xml, etc.)
           cp -r docs/public/* site/
-          # 2. Copy Vite landing site assets and branding files into site root
-          cp -r web/dist/assets site/
-          cp -r web/dist/icons site/ || true
-          cp -r web/dist/media site/ || true
-          cp web/dist/favicon.* site/ || true
-          cp web/dist/manifest.* site/ || true
-          cp web/dist/sw.js site/ || true
+          # 2. Copy Vite landing site assets, static QR images, and branding files into site root
+          cp -r web/dist/* site/
           # 3. Serve landing.html as root index.html (the official product website)
           cp web/dist/landing.html site/index.html
 

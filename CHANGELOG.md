@@ -14,7 +14,7 @@ Version 2.1.0 marks the official public release of **KV Files PRO**, bringing an
 
 ### Added
 - **Official ZaloPay Production Payment Gateway & VietQR**:
-  - Live production activation with approved Merchant App ID `210841`, Store ID `835219_835220_835221`, and partner BVBank virtual account (`99ZP26264M777568`).
+  - Live production activation with approved Merchant App ID `210841`, Store ID `835219_835220_835221`, and partner BVBank virtual account (`99ZP26264M77756812`).
   - Dual-key HMAC-SHA256 cryptography (Key1 for order generation & query, Key2 for IPN webhook callbacks).
   - Streamlined, privacy-focused checkout modal ([ZaloPayPaymentModal.tsx](file:///mnt/data/Projects/kv-file_PRO/web/src/components/modals/settings/ZaloPayPaymentModal.tsx)) with clean QR matrix centerpiece, zero address exposure, quick-copy transfer details, and admin one-click verification.
   - Multi-banking compatibility supporting ZaloPay app and 40+ Vietnamese banking apps via VietQR / Napas247 standard.

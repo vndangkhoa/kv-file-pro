@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   X,
-  ExternalLink,
   CheckCircle2,
   AlertCircle,
   Loader2,
@@ -51,6 +50,20 @@ export const ZaloPayPaymentModal: React.FC<ZaloPayPaymentModalProps> = ({
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [issuedLicenseKey, setIssuedLicenseKey] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState(false);
+  const [userNote, setUserNote] = useState('');
+  const [isSimulating, setIsSimulating] = useState(false);
+
+  // Safely resolve QR URL with Vite base URL for subpath and offline resilience
+  const resolveQrUrl = (url?: string) => {
+    const base = (import.meta as any).env?.BASE_URL || '/';
+    const fallback = `${base.replace(/\/$/, '')}/zalopay_pro_qr.png`;
+    if (!url) return fallback;
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+      return url;
+    }
+    const clean = url.replace(/^\//, '');
+    return `${base.replace(/\/$/, '')}/${clean}`;
+  };
 
   // Format currency in VND
   const formattedPrice = new Intl.NumberFormat('vi-VN', {
@@ -204,18 +217,47 @@ export const ZaloPayPaymentModal: React.FC<ZaloPayPaymentModalProps> = ({
     }
   };
 
+  // Developer / Sandbox instant simulator
+  const handleSimulatePayment = async () => {
+    if (!paymentData?.order_id) return;
+    try {
+      setIsSimulating(true);
+      const res = await fetch(`/api/v1/payments/dev/simulate/${paymentData.order_id}`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setIsPolling(false);
+        handlePaymentSuccess(data.license_key);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || err.message || 'Simulation failed');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Simulation network error');
+    } finally {
+      setIsSimulating(false);
+    }
+  };
 
   // Confirm transfer submitted
   const handleConfirmTransfer = async () => {
-    if (!paymentData?.order_id) return;
+    if (!paymentData?.order_id) {
+      alert('Đã ghi nhận yêu cầu. Vui lòng quét mã QR hoặc liên hệ quản trị viên với mã đơn để nhận bản quyền!');
+      return;
+    }
     try {
       setIsSubmittingTransfer(true);
+      const notePayload = userNote.trim()
+        ? `User confirmed: ${userNote.trim()}`
+        : 'User confirmed payment via ZaloPay / VietQR';
       const res = await fetch(`/api/v1/payments/orders/${paymentData.order_id}/submit-transfer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          note: 'User confirmed payment via ZaloPay / VietQR',
+          note: notePayload,
           trans_id: paymentData.app_trans_id,
         }),
       });
@@ -299,67 +341,33 @@ export const ZaloPayPaymentModal: React.FC<ZaloPayPaymentModalProps> = ({
             </div>
           </div>
 
-          {/* Dynamic Content: Loading / Error / Success / Awaiting / QR Form */}
+          {/* Offline/Error notice banner if any */}
+          {error && (
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-2xl text-xs text-amber-800 dark:text-amber-200 flex items-start justify-between gap-2.5">
+              <div className="flex items-start gap-2">
+                <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="font-semibold text-xs">Chế độ chuyển khoản trực tiếp (Ngoại tuyến / VietQR)</p>
+                  <p className="text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed">
+                    Bạn vẫn có thể quét mã VietQR bên dưới bằng app ngân hàng hoặc ZaloPay để thanh toán trực tiếp.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => initPayment(true)}
+                className="shrink-0 px-2.5 py-1 text-[10px] font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-all"
+              >
+                Sandbox Mode
+              </button>
+            </div>
+          )}
+
+          {/* Dynamic Content: Loading / Success / Awaiting / QR Form */}
           {isLoading ? (
             <div className="py-12 flex flex-col items-center justify-center gap-3 text-gray-500 dark:text-gray-400">
               <Loader2 className="animate-spin text-[#0068ff]" size={36} />
               <p className="text-xs font-medium">Initializing Secure ZaloPay Session...</p>
-            </div>
-          ) : error ? (
-            <div className="py-6 flex flex-col items-center justify-center gap-3 text-center">
-              <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-950/50 flex items-center justify-center text-red-500">
-                <AlertCircle size={24} />
-              </div>
-              <div className="space-y-1">
-                <h5 className="font-semibold text-sm text-gray-800 dark:text-gray-200">
-                  Payment Initialization Error
-                </h5>
-                <p className="text-xs text-red-600 dark:text-red-400 font-medium max-w-sm mx-auto">
-                  {error}
-                </p>
-              </div>
-
-              <div className="w-full bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60 rounded-2xl p-3.5 text-left text-xs space-y-3">
-                <div className="font-bold flex items-center gap-1.5 text-blue-900 dark:text-blue-200">
-                  <span>💡 ZaloPay Developer Guide:</span>
-                </div>
-                <p className="text-[11px] leading-relaxed text-gray-700 dark:text-gray-300">
-                  ZaloPay sandbox credentials (AppID <code>2554</code>) are configured by default. You can test immediately using sandbox mode:
-                </p>
-
-                {/* 1-Click Sandbox Test Mode Button */}
-                <div className="pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      initPayment(true);
-                    }}
-                    className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-blue-600 via-[#0068ff] to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white text-xs font-bold shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
-                  >
-                    <Sparkles size={14} />
-                    <span>Thử nghiệm thanh toán ngay (Sandbox Mode)</span>
-                  </button>
-                </div>
-
-                <div className="pt-0.5 flex items-center justify-between">
-                  <a
-                    href="https://developers.zalopay.vn/v2/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0068ff] dark:text-blue-400 hover:underline"
-                  >
-                    <span>Mở ZaloPay Developer Docs</span>
-                    <ExternalLink size={12} />
-                  </a>
-                </div>
-              </div>
-
-              <button
-                onClick={onClose}
-                className="mt-1 px-5 py-2 rounded-xl bg-gray-200 dark:bg-[#2d2d35] text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-300 transition-colors"
-              >
-                Dismiss
-              </button>
             </div>
           ) : isSuccess || orderStatus === 'PAID' ? (
             <div className="py-6 flex flex-col items-center justify-center gap-4 text-center animate-in zoom-in-95">
@@ -442,13 +450,26 @@ export const ZaloPayPaymentModal: React.FC<ZaloPayPaymentModalProps> = ({
               <div className="w-full bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/60 rounded-2xl p-4 text-left space-y-2 text-xs">
                 <div className="flex justify-between text-gray-600 dark:text-gray-300 text-[11px]">
                   <span>Order Reference:</span>
-                  <span className="font-mono font-bold">{paymentData?.order_id}</span>
+                  <span className="font-mono font-bold">{paymentData?.order_id || 'KV-OFFLINE-ORDER'}</span>
                 </div>
                 <div className="flex items-center gap-2 pt-1 text-[11px] text-amber-700 dark:text-amber-300">
                   <Loader2 size={13} className="animate-spin shrink-0" />
                   <span>Listening for ZaloPay callback webhook in background...</span>
                 </div>
               </div>
+
+              {/* Sandbox Instant Unlock Button */}
+              {(paymentData?.is_test_mode || paymentData?.is_mock || isAdmin) && (
+                <button
+                  type="button"
+                  onClick={handleSimulatePayment}
+                  disabled={isSimulating}
+                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  {isSimulating ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                  <span>Instant Test Unlock (Simulator)</span>
+                </button>
+              )}
 
               {/* Admin Quick Action if current user is Host Admin */}
               {isAdmin && (
@@ -492,9 +513,15 @@ export const ZaloPayPaymentModal: React.FC<ZaloPayPaymentModalProps> = ({
               <div className="flex flex-col items-center justify-center p-4 bg-gray-50 dark:bg-[#16161a] rounded-2xl border border-gray-100 dark:border-[#262630]">
                 <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-200 max-w-[220px] w-full flex items-center justify-center">
                   <img
-                    src={paymentData?.qr_code_url || '/zalopay_pro_qr.png'}
-                    alt="QR Code"
+                    src={resolveQrUrl(paymentData?.qr_code_url)}
+                    alt="QR Code Thanh Toán"
                     className="w-full h-auto rounded-xl object-contain block"
+                    onError={(e) => {
+                      const fallback = resolveQrUrl();
+                      if (e.currentTarget.src !== fallback) {
+                        e.currentTarget.src = fallback;
+                      }
+                    }}
                   />
                 </div>
 
@@ -521,11 +548,11 @@ export const ZaloPayPaymentModal: React.FC<ZaloPayPaymentModalProps> = ({
                   <span className="text-gray-500 dark:text-gray-400 text-[11px]">Số tài khoản:</span>
                   <div className="flex items-center gap-1.5 font-mono font-bold text-gray-900 dark:text-gray-100">
                     <span className="text-blue-600 dark:text-blue-400 select-all">
-                      {paymentData?.bank_account || '99ZP26264M777568'}
+                      {paymentData?.bank_account || '99ZP26264M77756812'}
                     </span>
                     <button
                       type="button"
-                      onClick={() => copyToClipboard(paymentData?.bank_account || '99ZP26264M777568', 'bank_account')}
+                      onClick={() => copyToClipboard(paymentData?.bank_account || '99ZP26264M77756812', 'bank_account')}
                       className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition-colors cursor-pointer"
                       title="Sao chép số tài khoản"
                     >
@@ -558,6 +585,17 @@ export const ZaloPayPaymentModal: React.FC<ZaloPayPaymentModalProps> = ({
                 <span>Tự động kích hoạt ngay sau khi chuyển khoản thành công</span>
               </div>
 
+              {/* Optional Transaction Reference Note */}
+              <div>
+                <input
+                  type="text"
+                  value={userNote}
+                  onChange={(e) => setUserNote(e.target.value)}
+                  placeholder="Mã giao dịch ngân hàng / Ghi chú (tùy chọn)"
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-gray-50 dark:bg-[#16161a] border border-gray-200 dark:border-[#2d2d35] text-gray-800 dark:text-gray-200 placeholder-gray-400 focus:outline-hidden focus:border-blue-500"
+                />
+              </div>
+
               {/* Action Buttons */}
               <div className="space-y-2 pt-0.5">
                 <button
@@ -569,6 +607,19 @@ export const ZaloPayPaymentModal: React.FC<ZaloPayPaymentModalProps> = ({
                   {isSubmittingTransfer ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                   <span>Tôi đã chuyển khoản / Xác nhận thanh toán</span>
                 </button>
+
+                {/* Developer / Sandbox Instant Simulator */}
+                {(paymentData?.is_test_mode || paymentData?.is_mock || isAdmin) && (
+                  <button
+                    type="button"
+                    onClick={handleSimulatePayment}
+                    disabled={isSimulating}
+                    className="w-full py-2 px-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-300/60 dark:border-amber-700/60 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    {isSimulating ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                    <span>Kích hoạt thử nghiệm ngay (Sandbox Mode)</span>
+                  </button>
+                )}
 
                 {/* Admin Quick Action */}
                 {isAdmin && (

@@ -25,7 +25,9 @@ import {
   KeyRound,
   Crown,
   Sparkles,
-  Server
+  Server,
+  X,
+  Smartphone
 } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
@@ -33,7 +35,15 @@ export const LandingPage: React.FC = () => {
   const [copiedDocker, setCopiedDocker] = useState(false);
   const [copiedCargo, setCopiedCargo] = useState(false);
   const [copiedKeygen, setCopiedKeygen] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [copiedPayField, setCopiedPayField] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'cad' | 'miller' | 'adobe'>('cad');
+
+  const copyPayInfo = (text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedPayField(field);
+    setTimeout(() => setCopiedPayField(null), 2000);
+  };
 
   const toggleTheme = () => {
     if (isDark) {
@@ -111,6 +121,14 @@ export const LandingPage: React.FC = () => {
             >
               Docs
             </a>
+
+            <button
+              onClick={() => setShowPaymentModal(true)}
+              className="hidden sm:inline-flex text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 dark:hover:bg-amber-900/50 border border-amber-300/80 dark:border-amber-700/60 text-amber-900 dark:text-amber-200 transition-all items-center gap-1.5 cursor-pointer shadow-xs"
+            >
+              <Crown className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              <span>Buy Pro</span>
+            </button>
 
             <a
               href="#deploy"
@@ -564,24 +582,30 @@ export const LandingPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Pro Feature 6: ZaloPay & MoMo Instant Gateway */}
-            <div className="p-7 rounded-3xl bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-slate-800 shadow-xl hover:-translate-y-1 transition-all flex flex-col justify-between">
+            {/* Pro Feature 6: ZaloPay & VietQR Instant Gateway */}
+            <div
+              onClick={() => setShowPaymentModal(true)}
+              className="p-7 rounded-3xl bg-white dark:bg-[#15161c] border border-slate-200/80 dark:border-slate-800 shadow-xl hover:-translate-y-1 transition-all flex flex-col justify-between cursor-pointer group hover:border-cyan-500/50"
+            >
               <div>
-                <div className="w-12 h-12 rounded-2xl bg-cyan-50 dark:bg-cyan-950/60 flex items-center justify-center text-cyan-600 dark:text-cyan-400 mb-5 border border-cyan-100 dark:border-cyan-900/50">
+                <div className="w-12 h-12 rounded-2xl bg-cyan-50 dark:bg-cyan-950/60 flex items-center justify-center text-cyan-600 dark:text-cyan-400 mb-5 border border-cyan-100 dark:border-cyan-900/50 group-hover:scale-105 transition-transform">
                   <Sparkles className="w-6 h-6" />
                 </div>
                 <div className="flex items-center gap-2 mb-2">
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition-colors">
                     Instant QR Payment Checkout
                   </h3>
                   <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-cyan-600 text-white">PRO</span>
                 </div>
                 <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                  Embedded production gateway supporting ZaloPay v2 and MoMo QR codes. Scan with banking or e-wallet apps for immediate verification and lifetime license unlocking.
+                  Embedded production gateway supporting ZaloPay v2 and VietQR codes. Scan with banking or e-wallet apps for immediate verification and lifetime license unlocking.
                 </p>
               </div>
               <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-xs text-slate-500">
-                <span className="font-semibold text-cyan-600 dark:text-cyan-400">Scan & Activate</span>
+                <span className="font-semibold text-cyan-600 dark:text-cyan-400 flex items-center gap-1 group-hover:underline">
+                  <span>Scan & Activate QR (199.000 ₫)</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </span>
                 <span className="text-[11px]">Lifetime Ownership</span>
               </div>
             </div>
@@ -804,6 +828,144 @@ export const LandingPage: React.FC = () => {
           </div>
         </div>
       </footer>
+
+      {/* Interactive ZaloPay / VietQR Payment Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-in fade-in duration-150 select-none">
+          <div className="bg-white dark:bg-[#1e1e24] border border-gray-200 dark:border-[#33333d] rounded-3xl max-w-md w-full overflow-hidden shadow-2xl transition-all">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-[#0068ff] via-[#0084f4] to-[#0052cc] p-5 text-white relative">
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="absolute right-4 top-4 p-1.5 rounded-full bg-black/20 hover:bg-black/30 text-white transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-white p-1.5 flex items-center justify-center shadow-md">
+                  <svg viewBox="0 0 100 100" className="w-full h-full fill-[#0068ff]">
+                    <rect width="100" height="100" rx="20" fill="white" />
+                    <path
+                      d="M26 30h48c2.2 0 4 1.8 4 4v3.5c0 1.2-.5 2.3-1.4 3.1L48.2 65H74c2.2 0 4 1.8 4 4v2c0 2.2-1.8 4-4 4H26c-2.2 0-4-1.8-4-4v-3.5c0-1.2.5-2.3 1.4-3.1L51.8 39H26c-2.2 0-4-1.8-4-4v-2c0-2.2 1.8-4 4-4z"
+                      fill="#0068ff"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-bold text-base tracking-tight">Thanh toán ZaloPay / VietQR</h3>
+                  <p className="text-white/80 text-xs">Quét mã QR để nâng cấp KV FILE PRO</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 sm:p-6 space-y-4">
+              {/* Product Info */}
+              <div className="bg-gray-50 dark:bg-[#16161a] p-3.5 rounded-2xl border border-gray-100 dark:border-[#2a2a32] flex items-center justify-between">
+                <div>
+                  <h4 className="font-bold text-sm text-gray-900 dark:text-gray-100">
+                    KV Files Pro — Lifetime All-Access Pass
+                  </h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Bản quyền vĩnh viễn (Trọn đời)
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-base font-extrabold text-[#0068ff] dark:text-[#38bdf8]">
+                    199.000 ₫
+                  </span>
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wide">Trọn gói 1 lần</p>
+                </div>
+              </div>
+
+              {/* QR Code Container */}
+              <div className="flex flex-col items-center justify-center p-4 bg-gray-50 dark:bg-[#16161a] rounded-2xl border border-gray-100 dark:border-[#262630]">
+                <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-200 max-w-[220px] w-full flex items-center justify-center">
+                  <img
+                    src={`${(import.meta as any).env?.BASE_URL?.replace(/\/$/, '') || ''}/zalopay_pro_qr.png`}
+                    alt="ZaloPay VietQR"
+                    className="w-full h-auto rounded-xl object-contain block"
+                  />
+                </div>
+
+                <div className="mt-3 flex flex-col items-center gap-1 text-center">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-800 dark:text-gray-200">
+                    <Smartphone size={14} className="text-[#0068ff]" />
+                    <span>Quét bằng Ví ZaloPay hoặc App Ngân Hàng (VietQR)</span>
+                  </div>
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                    Hỗ trợ tất cả ngân hàng: Vietcombank, MB, Techcombank, ACB, VPBank...
+                  </p>
+                </div>
+              </div>
+
+              {/* Bank Details */}
+              <div className="bg-gray-50 dark:bg-[#16161a] p-3 rounded-2xl border border-gray-100 dark:border-[#2a2a32] text-xs space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500 dark:text-gray-400 text-[11px]">Ngân hàng:</span>
+                  <span className="font-semibold text-gray-800 dark:text-gray-200">BVBank (Bản Việt)</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500 dark:text-gray-400 text-[11px]">Số tài khoản:</span>
+                  <div className="flex items-center gap-1.5 font-mono font-bold text-gray-900 dark:text-gray-100">
+                    <span className="text-blue-600 dark:text-blue-400 select-all">99ZP26264M77756812</span>
+                    <button
+                      type="button"
+                      onClick={() => copyPayInfo('99ZP26264M77756812', 'account')}
+                      className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition-colors cursor-pointer"
+                      title="Sao chép số tài khoản"
+                    >
+                      {copiedPayField === 'account' ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500 dark:text-gray-400 text-[11px]">Chủ tài khoản:</span>
+                  <span className="font-semibold text-gray-800 dark:text-gray-200">KV FILE PRO (Thu Ngân)</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500 dark:text-gray-400 text-[11px]">Nội dung CK:</span>
+                  <div className="flex items-center gap-1.5 font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                    <span className="select-all">KV FILE PRO</span>
+                    <button
+                      type="button"
+                      onClick={() => copyPayInfo('KV FILE PRO', 'content')}
+                      className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition-colors cursor-pointer"
+                      title="Sao chép nội dung"
+                    >
+                      {copiedPayField === 'content' ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Note */}
+              <div className="flex items-center justify-center gap-2 py-0.5 text-[11px] text-gray-500 dark:text-gray-400">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span>Tự động kích hoạt ngay sau khi chuyển khoản thành công</span>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPaymentModal(false);
+                  }}
+                  className="w-full py-2.5 px-4 bg-gradient-to-r from-[#0068ff] via-[#0084f4] to-[#0052cc] hover:from-blue-600 hover:to-blue-700 text-white rounded-xl text-xs font-bold shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <Check size={14} />
+                  <span>Xác nhận thông tin & Đóng</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

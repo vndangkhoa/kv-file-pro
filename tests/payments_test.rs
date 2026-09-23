@@ -212,7 +212,7 @@ fn test_zalopay_v2_credentials_and_signatures() {
     assert_eq!(prod_cfg.merchant_name, "KV FILE PRO (Thu Ngân)");
     assert_eq!(prod_cfg.bank_name, "BVBank (Ngân hàng Bản Việt)");
     assert_eq!(prod_cfg.bank_bin, "970454");
-    assert_eq!(prod_cfg.account_no, "99ZP26264M777568");
+    assert_eq!(prod_cfg.account_no, "99ZP26264M77756812");
     assert_eq!(prod_cfg.qr_image_url, "/zalopay_pro_qr.png");
 }
 

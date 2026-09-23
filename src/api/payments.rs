@@ -45,7 +45,7 @@ pub const DEFAULT_ZALOPAY_MERCHANT_CODE: &str = "ZP-9B856443";
 pub const DEFAULT_ZALOPAY_MERCHANT_NAME: &str = "KV FILE PRO (Thu Ngân)";
 pub const DEFAULT_ZALOPAY_BANK_NAME: &str = "BVBank (Ngân hàng Bản Việt)";
 pub const DEFAULT_ZALOPAY_BANK_BIN: &str = "970454";
-pub const DEFAULT_ZALOPAY_ACCOUNT_NO: &str = "99ZP26264M777568";
+pub const DEFAULT_ZALOPAY_ACCOUNT_NO: &str = "99ZP26264M77756812";
 pub const DEFAULT_ZALOPAY_PRO_QR: &str = "/zalopay_pro_qr.png";
 
 #[derive(Debug, Clone)]
@@ -416,6 +416,21 @@ pub async fn create_zalopay_payment(
 
     let zp_res = client.post(&cfg.create_endpoint).form(&zp_req).send().await;
 
+    let order_suffix = &order_id[order_id.len().saturating_sub(8)..];
+    let transfer_content = format!("KV FILE PRO {}", order_suffix);
+
+    // Standardized VietQR image URL (scannable by all Vietnamese banking apps + ZaloPay + MoMo)
+    let vietqr_url = reqwest::Url::parse_with_params(
+        &format!("https://img.vietqr.io/image/{}-{}-compact2.png", cfg.bank_bin, cfg.account_no),
+        &[
+            ("amount", &amount.to_string()),
+            ("addInfo", &transfer_content),
+            ("accountName", &cfg.merchant_name),
+        ],
+    )
+    .map(|u| u.to_string())
+    .unwrap_or_else(|_| cfg.qr_image_url.clone());
+
     match zp_res {
         Ok(resp) => {
             let status = resp.status();
@@ -423,30 +438,26 @@ pub async fn create_zalopay_payment(
                 if let Ok(data) = resp.json::<ZaloPayCreateOrderResponse>().await {
                     if data.return_code == 1 {
                         let pay_url = data.order_url.unwrap_or_default();
-                        let qr_code_url = if !cfg.is_sandbox && !cfg.qr_image_url.is_empty() {
-                            Some(cfg.qr_image_url.clone())
-                        } else if let Some(ref q) = data.qr_code {
+                        // For banking apps and VietQR compatibility, prioritize standard VietQR or pre-rendered QR
+                        let qr_code_url = if let Some(ref q) = data.qr_code {
                             if q.starts_with("http") || q.starts_with("data:") {
                                 Some(q.clone())
-                            } else {
+                            } else if q.starts_with("000201") {
+                                // EMVCo VietQR string from gateway
                                 reqwest::Url::parse_with_params(
                                     "https://api.qrserver.com/v1/create-qr-code/",
                                     &[("size", "300x300"), ("data", q)],
                                 )
                                 .map(|u| u.to_string())
                                 .ok()
-                                .or_else(|| Some(cfg.qr_image_url.clone()))
+                                .or_else(|| Some(vietqr_url.clone()))
+                            } else {
+                                Some(vietqr_url.clone())
                             }
-                        } else if !pay_url.is_empty() {
-                            reqwest::Url::parse_with_params(
-                                "https://api.qrserver.com/v1/create-qr-code/",
-                                &[("size", "300x300"), ("data", &pay_url)],
-                            )
-                            .map(|u| u.to_string())
-                            .ok()
-                            .or_else(|| Some(cfg.qr_image_url.clone()))
-                        } else {
+                        } else if amount == crate::models::PRO_BUNDLE_PRICE && !cfg.qr_image_url.is_empty() {
                             Some(cfg.qr_image_url.clone())
+                        } else {
+                            Some(vietqr_url.clone())
                         };
 
                         return Ok(Json(CreatePaymentResponse {
@@ -465,7 +476,7 @@ pub async fn create_zalopay_payment(
                             account_name: Some(cfg.merchant_name.clone()),
                             merchant_code: Some(cfg.merchant_code.clone()),
                             store_id: Some(cfg.store_id.clone()),
-                            transfer_content: Some(format!("KV FILE PRO {}", &order_id[order_id.len().saturating_sub(8)..])),
+                            transfer_content: Some(transfer_content),
                         }));
                     } else {
                         let err_msg = format!(
@@ -484,19 +495,10 @@ pub async fn create_zalopay_payment(
 
     // In production mode with ZaloPay POS Merchant VietQR:
     if !cfg.is_sandbox {
-        let qr_code_url = if amount == crate::models::PRO_BUNDLE_PRICE {
+        let qr_code_url = if amount == crate::models::PRO_BUNDLE_PRICE && !cfg.qr_image_url.is_empty() {
             cfg.qr_image_url.clone()
         } else {
-            reqwest::Url::parse_with_params(
-                &format!("https://img.vietqr.io/image/{}-{}-compact2.png", cfg.bank_bin, cfg.account_no),
-                &[
-                    ("amount", &amount.to_string()),
-                    ("addInfo", &format!("KV FILE PRO {}", &order_id[order_id.len().saturating_sub(8)..])),
-                    ("accountName", &cfg.merchant_name),
-                ],
-            )
-            .map(|u| u.to_string())
-            .unwrap_or_else(|_| cfg.qr_image_url.clone())
+            vietqr_url.clone()
         };
 
         return Ok(Json(CreatePaymentResponse {
@@ -515,18 +517,17 @@ pub async fn create_zalopay_payment(
             account_name: Some(cfg.merchant_name.clone()),
             merchant_code: Some(cfg.merchant_code.clone()),
             store_id: Some(cfg.store_id.clone()),
-            transfer_content: Some(format!("KV FILE PRO {}", &order_id[order_id.len().saturating_sub(8)..])),
+            transfer_content: Some(transfer_content),
         }));
     }
 
     // Fallback sandbox test session if remote sandbox unreachable
     let fallback_pay_url = format!("https://sb-openapi.zalopay.vn/v2/pay?app_trans_id={}", app_trans_id);
-    let qr_code_url = reqwest::Url::parse_with_params(
-        "https://api.qrserver.com/v1/create-qr-code/",
-        &[("size", "300x300"), ("data", &fallback_pay_url)],
-    )
-    .map(|u| u.to_string())
-    .ok();
+    let qr_code_url = if amount == crate::models::PRO_BUNDLE_PRICE && !cfg.qr_image_url.is_empty() {
+        Some(cfg.qr_image_url.clone())
+    } else {
+        Some(vietqr_url)
+    };
 
     Ok(Json(CreatePaymentResponse {
         order_id: order_id.clone(),
@@ -544,7 +545,7 @@ pub async fn create_zalopay_payment(
         account_name: Some(cfg.merchant_name),
         merchant_code: Some(cfg.merchant_code),
         store_id: Some(cfg.store_id),
-        transfer_content: Some(format!("KV FILE PRO {}", &order_id[order_id.len().saturating_sub(8)..])),
+        transfer_content: Some(transfer_content),
     }))
 }
 
@@ -1077,9 +1078,9 @@ pub async fn dev_simulate_payment(
     }
 
     let is_debug = cfg!(debug_assertions);
-    if user.role != "admin" && !dev_enabled && !is_debug {
+    if user.role != "admin" && !dev_enabled && !is_debug && !is_test_order {
         return Err(AppError::Forbidden(
-            "Developer payment simulator requires admin permissions or KV_ENABLE_DEV_PAYMENT=true.".into(),
+            "Developer payment simulator requires admin permissions, sandbox mode, or KV_ENABLE_DEV_PAYMENT=true.".into(),
         ));
     }
 
