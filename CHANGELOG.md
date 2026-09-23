@@ -5,6 +5,36 @@ All notable changes to **KV Files (`kv-file`)** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0-2] - 2026-09-23
+
+### 🛡️ Payment Security Hardening, Gateway Verification & Multi-Registry Release
+This release strengthens payment integrity and licensing security across KV Files PRO, enforcing real-time ZaloPay gateway payment verification, removing unauthorized approval bypasses, fixing VietQR generation for BVBank accounts, and distributing multi-registry Docker containers and Synology DSM SPKs.
+
+### Security
+- **Strict Gateway Payment Verification**:
+  - Implemented mandatory real-time ZaloPay query verification (`query_zalopay_order_status`) in `admin_approve_order`. Admin approval strictly rejects pending or unpaid transactions (return code 2/3), preventing unauthorized access grants without verified payment.
+  - Added secure manual bank transfer override requiring explicit `force_manual: true` and an audit note of at least 5 characters.
+  - Removed checkout bypass buttons, test simulators, and instant approval shortcuts from public modal interfaces (`ZaloPayPaymentModal.tsx`).
+  - Added comprehensive automated regression tests verifying that unconfirmed orders cannot be approved without manual override audit trail (`test_admin_approve_verification_guard`).
+
+### Fixed
+- **VietQR & BVBank Integration**:
+  - Fixed BVBank virtual account format (`99ZP26264M77756812`) and QR payload generation according to VietQR / Napas247 specification.
+  - Enhanced QR modal display with dynamic matrix scaling, account details copy pills, and live gateway status polling.
+- **Landing Page & Desktop Hero Viewport**:
+  - Eliminated floating card overlap in the hero section across desktop and tablet viewports.
+  - Added dedicated spacious desktop preview window showcase with native window control header.
+
+### Distribution
+- **Multi-Registry Docker Release**:
+  - Built and published release containers tagged `:latest` and `:2.1.0` across:
+    - Docker Hub (`docker.io/vndangkhoa/kv-file-pro`)
+    - GitHub Packages (`ghcr.io/vndangkhoa/kv-file-pro`)
+    - Forgejo Primary (`git.khoavo.vndns.net/vndangkhoa/kv-file-pro`)
+    - Forgejo Secondary (`git.khoavo.myds.me/vndangkhoa/kv-file-pro`)
+- **Synology Package Center (SPK)**:
+  - Published and activated Synology SPK build `2.1.0-2` to [`https://syno.vndns.net/package/kv-file-pro`](https://syno.vndns.net/package/kv-file-pro) with alias redirect support for `kvfilepro`.
+
 ---
 
 ## [2.1.0] - 2026-09-21
