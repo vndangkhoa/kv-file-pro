@@ -10,10 +10,13 @@ import {
   Type,
   Workflow,
   Loader2,
+  Crown,
+  Palette,
 } from 'lucide-react';
 import { FileItem } from '../../types';
 import { api } from '../../services/api';
 import { FileIcon } from '../common/FileIcon';
+import { useExtensionStore } from '../../stores/useExtensionStore';
 import Prism from 'prismjs';
 import 'prismjs/themes/prism-tomorrow.css';
 
@@ -51,8 +54,10 @@ export const UniversalInspectorPreview: React.FC<UniversalInspectorPreviewProps>
   onOpenQuickLook,
   className = '',
 }) => {
+  const { isProLicensed, extensions } = useExtensionStore();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [unlicensedInfo, setUnlicensedInfo] = useState<{ extName: string; price: number; icon: React.ElementType } | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [canvasElement, setCanvasElement] = useState<HTMLCanvasElement | null>(null);
   const [fontFamilyName, setFontFamilyName] = useState<string | null>(null);
@@ -107,11 +112,75 @@ export const UniversalInspectorPreview: React.FC<UniversalInspectorPreviewProps>
     setAdobeProjectSummary(null);
     setCad3dSummary(null);
     setSysvisSummary(null);
+    setUnlicensedInfo(null);
 
     const fileUrl = api.getRawFileUrl(item.root_name, item.path);
 
     async function generatePreview() {
       try {
+        // Check Extension Paywall for non-free formats
+        const isCadExt = ['dwg', 'dxf', 'ifc', 'step', 'stp', 'iges', 'igs', 'brep', 'stl', 'obj', 'gltf', 'glb', '3mf', 'ply', 'fbx'].includes(ext);
+        const isAdobeExt = ['psd', 'psb', 'ai', 'eps', 'indd', 'indt', 'idml', 'xd', 'prproj', 'aep', 'aepx', 'dng', 'cr2', 'nef', 'raw', 'arw'].includes(ext);
+        const isFontExt = ['ttf', 'otf', 'woff', 'woff2', 'eot'].includes(ext);
+        const isSysvisExt = ['mmd', 'mermaid', 'flow', 'arch', 'diag'].includes(ext);
+        const isArchiveExt = ['zip', 'tar', 'gz', 'tgz', '7z'].includes(ext);
+        const isCorelExt = ['cdr', 'cdt', 'cdx', 'cmx'].includes(ext);
+
+        const isCadLicensed = isProLicensed || !!extensions.find((e) => e.id === 'cad-viewer')?.isPurchased;
+        const isAdobeLicensed = isProLicensed || !!extensions.find((e) => e.id === 'adobe-suite-viewer')?.isPurchased;
+        const isFontLicensed = isProLicensed || !!extensions.find((e) => e.id === 'font-viewer')?.isPurchased;
+        const isSysvisLicensed = isProLicensed || !!extensions.find((e) => e.id === 'sysvis-flow-viewer')?.isPurchased;
+        const isArchiveLicensed = isProLicensed || !!extensions.find((e) => e.id === 'archive-inspector')?.isPurchased;
+        const isCorelLicensed = isProLicensed || !!extensions.find((e) => e.id === 'coreldraw-viewer')?.isPurchased;
+
+        if (isCadExt && !isCadLicensed) {
+          if (!cancelled) {
+            setUnlicensedInfo({ extName: 'Universal CAD & 3D Viewer', price: 99000, icon: Box });
+            setLoading(false);
+          }
+          return;
+        }
+
+        if (isAdobeExt && !isAdobeLicensed) {
+          if (!cancelled) {
+            setUnlicensedInfo({ extName: 'Adobe Creative Suite Studio', price: 79000, icon: Palette });
+            setLoading(false);
+          }
+          return;
+        }
+
+        if (isFontExt && !isFontLicensed) {
+          if (!cancelled) {
+            setUnlicensedInfo({ extName: 'Typography & Font Studio', price: 39000, icon: Type });
+            setLoading(false);
+          }
+          return;
+        }
+
+        if (isSysvisExt && !isSysvisLicensed) {
+          if (!cancelled) {
+            setUnlicensedInfo({ extName: 'SysVis Flow Animator', price: 49000, icon: Workflow });
+            setLoading(false);
+          }
+          return;
+        }
+
+        if (isArchiveExt && !isArchiveLicensed) {
+          if (!cancelled) {
+            setUnlicensedInfo({ extName: 'Archive Deep Inspector', price: 29000, icon: FolderArchive });
+            setLoading(false);
+          }
+          return;
+        }
+
+        if (isCorelExt && !isCorelLicensed) {
+          if (!cancelled) {
+            setUnlicensedInfo({ extName: 'CorelDRAW Graphics Studio', price: 49000, icon: Palette });
+            setLoading(false);
+          }
+          return;
+        }
+
         // 1. Native Web Images
         if (item.media_type === 'image' && WEB_IMAGE_EXTS.has(ext)) {
           if (!cancelled) {
@@ -457,7 +526,7 @@ export const UniversalInspectorPreview: React.FC<UniversalInspectorPreviewProps>
     return () => {
       cancelled = true;
     };
-  }, [item.path, item.root_name, ext]);
+  }, [item.path, item.root_name, ext, isProLicensed, extensions]);
 
   // Loading indicator
   if (loading) {
@@ -467,6 +536,36 @@ export const UniversalInspectorPreview: React.FC<UniversalInspectorPreviewProps>
         <span className="text-[11px] font-mono text-gray-400">
           Decoding {ext.toUpperCase()} stream...
         </span>
+      </div>
+    );
+  }
+
+  // 0. Render Paywall Lock Card for Unlicensed Paid Formats
+  if (unlicensedInfo) {
+    const IconComp = unlicensedInfo.icon;
+    return (
+      <div
+        onClick={onOpenQuickLook}
+        className={`relative w-full h-full flex flex-col items-center justify-center p-3 cursor-pointer group/preview select-none overflow-hidden rounded bg-gray-50/80 dark:bg-[#1c1d22] border border-amber-500/30 text-center ${className}`}
+        title="Click to view unlock options in Quick Look"
+      >
+        <div className="w-11 h-11 rounded-xl bg-amber-500/10 text-amber-500 dark:text-amber-400 flex items-center justify-center mb-1.5 transition-transform group-hover/preview:scale-105 shadow-2xs">
+          <IconComp size={22} />
+        </div>
+        <div className="text-[11px] font-bold text-gray-800 dark:text-gray-100 truncate max-w-full px-1">
+          {item.name}
+        </div>
+        <div className="text-[9px] font-mono text-amber-600 dark:text-amber-400 font-bold uppercase tracking-wider mt-1 flex items-center gap-1">
+          <Crown size={10} />
+          <span>PRO Extension Required</span>
+        </div>
+        <p className="text-[10px] text-gray-400 mt-1 line-clamp-1">
+          {unlicensedInfo.extName}
+        </p>
+        <div className="mt-2.5 px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-semibold flex items-center gap-1 shadow-2xs transition-all">
+          <Eye size={11} />
+          <span>Unlock in Quick Look</span>
+        </div>
       </div>
     );
   }

@@ -423,9 +423,14 @@ export const useExtensionStore = create<ExtensionStoreState>()(
 
       toggleExtension: (id: string) => {
         set((state) => ({
-          extensions: state.extensions.map((ext) =>
-            ext.id === id ? { ...ext, enabled: !ext.enabled } : ext
-          ),
+          extensions: state.extensions.map((ext) => {
+            if (ext.id !== id) return ext;
+            const isOwned = state.isProLicensed || !ext.isPaid || ext.isPurchased;
+            if (!isOwned) {
+              return { ...ext, installed: false, enabled: false };
+            }
+            return { ...ext, enabled: !ext.enabled };
+          }),
         }));
       },
 
@@ -541,18 +546,6 @@ export const useExtensionStore = create<ExtensionStoreState>()(
           if (res.ok) {
             const data: SystemEditionInfo = await res.json();
             set({ systemEdition: data });
-            if (data.is_licensed) {
-              set((state) => ({
-                isProLicensed: true,
-                proLicenseKey: data.license_id || state.proLicenseKey,
-                extensions: state.extensions.map((ext) => ({
-                  ...ext,
-                  isPurchased: true,
-                  installed: ext.isPaid ? (ext.installed ?? true) : ext.installed,
-                  enabled: ext.isPaid ? (ext.enabled ?? true) : ext.enabled,
-                })),
-              }));
-            }
           }
         } catch {
           // Offline fallback
@@ -595,15 +588,15 @@ export const useExtensionStore = create<ExtensionStoreState>()(
         if (!persistedState || !Array.isArray(persistedState.extensions)) {
           return currentState;
         }
-        // In production, licenses are governed strictly by the backend SQLite database.
-        // We only restore user UI toggles (installed, enabled), never trusting unverified purchase flags.
+        // In production, licenses are governed strictly by the backend SQLite database for each user.
+        // We never restore unverified purchase or enabled flags for paid extensions.
         const merged = currentState.extensions.map((defaultExt) => {
           const found = persistedState.extensions.find((p: ExtensionManifest) => p.id === defaultExt.id);
           if (found) {
             return {
               ...defaultExt,
-              installed: Boolean(found.installed),
-              enabled: Boolean(found.enabled),
+              installed: !defaultExt.isPaid && Boolean(found.installed),
+              enabled: !defaultExt.isPaid && Boolean(found.enabled),
               isPurchased: !defaultExt.isPaid,
             };
           }

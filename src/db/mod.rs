@@ -204,23 +204,25 @@ impl Database {
         )
         .map_err(|e| AppError::Db(format!("Failed to create user: {}", e)))?;
 
-        // Auto-assign pro license if global pro license exists in settings
-        let lic_key_opt: Option<String> = conn
-            .query_row(
-                "SELECT value FROM settings WHERE key = 'pro_license_key'",
-                [],
-                |row| row.get(0),
-            )
-            .ok();
+        // Auto-assign pro license only if user is system admin and pro license exists
+        if role == "admin" {
+            let lic_key_opt: Option<String> = conn
+                .query_row(
+                    "SELECT value FROM settings WHERE key = 'pro_license_key'",
+                    [],
+                    |row| row.get(0),
+                )
+                .ok();
 
-        if let Some(lic_key) = lic_key_opt {
-            let lic_id = format!("LIC-{}", Uuid::new_v4());
-            let _ = conn.execute(
-                "INSERT INTO extension_licenses (id, user_id, extension_id, order_id, license_key, purchased_at)
-                 VALUES (?1, ?2, 'kv-files-pro-all', 'ORD-GLOBAL', ?3, ?4)
-                 ON CONFLICT(user_id, extension_id) DO NOTHING",
-                params![lic_id, id, lic_key, created_at],
-            );
+            if let Some(lic_key) = lic_key_opt {
+                let lic_id = format!("LIC-{}", Uuid::new_v4());
+                let _ = conn.execute(
+                    "INSERT INTO extension_licenses (id, user_id, extension_id, order_id, license_key, purchased_at)
+                     VALUES (?1, ?2, 'kv-files-pro-all', 'ORD-GLOBAL', ?3, ?4)
+                     ON CONFLICT(user_id, extension_id) DO NOTHING",
+                    params![lic_id, id, lic_key, created_at],
+                );
+            }
         }
 
         Ok(User {
@@ -1282,7 +1284,7 @@ impl Database {
         );
 
         let mut stmt = conn
-            .prepare("SELECT id FROM users")
+            .prepare("SELECT id FROM users WHERE role = 'admin'")
             .map_err(|e| AppError::Db(e.to_string()))?;
         let user_ids: Vec<String> = stmt
             .query_map([], |row| row.get(0))
@@ -1310,8 +1312,6 @@ impl Database {
             .prepare("SELECT value FROM settings WHERE key = 'pro_license_key'")
             .map_err(|e| AppError::Db(e.to_string()))?;
         let key_opt: Option<String> = stmt.query_row([], |row| row.get(0)).ok();
-        drop(stmt);
-        drop(conn);
 
         if let Some(key) = key_opt {
             if crate::licensing::is_master_activation_code(&key) {
@@ -1328,17 +1328,31 @@ impl Database {
             if let Ok(payload) = crate::licensing::verify_pro_license(&key, None) {
                 return Ok(Some(payload));
             }
-            let trimmed = key.trim();
-            if !trimmed.is_empty() && (trimmed.starts_with("KV-") || trimmed.starts_with("ZP-") || trimmed.starts_with("MOMO-")) {
-                return Ok(Some(crate::licensing::LicensePayload {
-                    id: "LEGACY-LIC".into(),
-                    user: "admin".into(),
-                    tier: "kv-files-pro-all".into(),
-                    customer_email: None,
-                    issued_at: chrono::Utc::now().timestamp(),
-                    expires_at: None,
-                    features: vec!["all".into()],
-                }));
+            // Cryptographic HMAC check against candidate secrets
+            let instance_secret = {
+                let mut s = conn
+                    .prepare("SELECT value FROM settings WHERE key = 'license_signing_secret'")
+                    .map_err(|e| AppError::Db(e.to_string()))?;
+                s.query_row([], |row| row.get::<_, String>(0)).ok()
+            };
+            let zalopay_key = std::env::var("ZALOPAY_KEY1")
+                .unwrap_or_else(|_| "sdngKKJmqEMzvhQgsvDQIUybtEcngMpl".into());
+            let mut candidate_secrets = vec![crate::api::payments::DEFAULT_LICENSE_SECRET, &zalopay_key];
+            if let Some(ref is) = instance_secret {
+                candidate_secrets.push(is);
+            }
+            if let Some(ext_id) = crate::api::payments::verify_license_against_secrets(&key, &candidate_secrets) {
+                if ext_id == "kv-files-pro-all" || ext_id == "PRO" {
+                    return Ok(Some(crate::licensing::LicensePayload {
+                        id: format!("LIC-{}", Uuid::new_v4()),
+                        user: "Host".into(),
+                        tier: "kv-files-pro-all".into(),
+                        customer_email: None,
+                        issued_at: chrono::Utc::now().timestamp(),
+                        expires_at: None,
+                        features: vec!["all".into()],
+                    }));
+                }
             }
         }
         Ok(None)

@@ -44,7 +44,7 @@ export const QuickLookModal: React.FC = () => {
     playVideo,
   } = useExplorerStore();
   const { startDownload } = useDownloadStore();
-  const { getPreviewerForExt, getAvailableExtensionForExt, installExtension } = useExtensionStore();
+  const { getPreviewerForExt, getAvailableExtensionForExt, installExtension, isProLicensed, extensions } = useExtensionStore();
   const { openSettings } = useSettingsStore();
 
   const [textContent, setTextContent] = useState<string | null>(null);
@@ -107,6 +107,12 @@ export const QuickLookModal: React.FC = () => {
   const ext = (item.extension || (item.name ? item.name.split('.').pop() : '') || '').toLowerCase().replace(/^\./, '');
   const activeExtension = getPreviewerForExt(ext);
   const availableExtension = !activeExtension ? getAvailableExtensionForExt(ext) : undefined;
+
+  const isSysvisLicensed = isProLicensed || !!extensions.find((e) => e.id === 'sysvis-flow-viewer')?.isPurchased;
+  const isMarkdownLicensed = isProLicensed || !!extensions.find((e) => e.id === 'markdown-enhanced')?.isPurchased;
+  const isVectorLicensed = isProLicensed || !!extensions.find((e) => e.id === 'vector-svg-studio')?.isPurchased;
+  const isCodeLicensed = isProLicensed || !!extensions.find((e) => e.id === 'code-config-studio')?.isPurchased;
+
   const isWorkflow =
     ext === 'json' &&
     (textContent
@@ -127,7 +133,7 @@ export const QuickLookModal: React.FC = () => {
         className={`bg-white dark:bg-[#1e1e1e] sm:rounded-xl shadow-2xl border-0 sm:border border-gray-200 dark:border-[#333333] flex flex-col overflow-hidden transition-all ${
           isFullscreen
             ? 'w-full h-full rounded-none'
-            : (activeExtension || (ext === 'md' && markdownRenderMode === 'rendered') || (isWorkflow && jsonRenderMode === 'flow') || ['svg', 'svgz'].includes(ext))
+            : (activeExtension || (ext === 'md' && markdownRenderMode === 'rendered' && isMarkdownLicensed) || (isWorkflow && jsonRenderMode === 'flow' && isSysvisLicensed) || (['svg', 'svgz'].includes(ext) && isVectorLicensed))
             ? 'w-full h-full sm:h-[90vh] sm:max-h-[92vh] sm:w-[94vw] sm:max-w-7xl rounded-none sm:rounded-xl'
             : 'w-full h-full sm:h-[78vh] sm:max-h-[85vh] sm:max-w-4xl rounded-none sm:rounded-xl'
         }`}
@@ -233,23 +239,115 @@ export const QuickLookModal: React.FC = () => {
         </div>
 
         {/* Content Viewer Body */}
-        <div className={`flex-1 overflow-auto flex items-center justify-center ${(activeExtension || (ext === 'md' && markdownRenderMode === 'rendered') || (isWorkflow && jsonRenderMode === 'flow') || ['svg', 'svgz'].includes(ext)) && (ext !== 'md' || markdownRenderMode !== 'raw') ? 'p-0' : 'p-2 sm:p-4'} bg-gray-50 dark:bg-[#181818]`}>
+        <div className={`flex-1 overflow-auto flex items-center justify-center ${(activeExtension || (ext === 'md' && markdownRenderMode === 'rendered' && isMarkdownLicensed) || (isWorkflow && jsonRenderMode === 'flow' && isSysvisLicensed) || (['svg', 'svgz'].includes(ext) && isVectorLicensed)) && (ext !== 'md' || markdownRenderMode !== 'raw') ? 'p-0' : 'p-2 sm:p-4'} bg-gray-50 dark:bg-[#181818]`}>
           {isWorkflow && jsonRenderMode === 'flow' ? (
-            <SysVisViewer
-              fileUrl={rawUrl}
-              fileName={item.name}
-              fileSize={item.size}
-              extension={ext}
-              onDownload={handleDownload}
-            />
+            isSysvisLicensed ? (
+              <SysVisViewer
+                fileUrl={rawUrl}
+                fileName={item.name}
+                fileSize={item.size}
+                extension={ext}
+                onDownload={handleDownload}
+              />
+            ) : (
+              <div className="w-full max-w-md p-6 bg-white dark:bg-[#252526] rounded-2xl shadow-xl border border-gray-200 dark:border-[#333333] flex flex-col items-center gap-4 text-center animate-in zoom-in-95">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+                  <Workflow size={28} />
+                </div>
+                <div>
+                  <div className="flex items-center justify-center gap-1.5 mb-1">
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800/80">
+                      KV File PRO Exclusive
+                    </span>
+                  </div>
+                  <h3 className="font-bold text-base text-gray-900 dark:text-gray-100">
+                    SysVis Architecture & Flow Animator
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                    Interactive animated node pipelines, ComfyUI graphs, and DAG flowcharts require the SysVis Flow Viewer extension.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 w-full pt-1">
+                  <button
+                    onClick={() => {
+                      setQuickLookOpen(false);
+                      openSettings('extensions');
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-blue-600/20 transition-all active:scale-95 cursor-pointer"
+                  >
+                    <Crown size={15} className="text-amber-200" />
+                    <span>Unlock Extension (49.000 ₫)</span>
+                  </button>
+                  <button
+                    onClick={() => setJsonRenderMode('code')}
+                    className="px-3 py-2.5 bg-gray-100 dark:bg-[#333] hover:bg-gray-200 dark:hover:bg-[#444] text-gray-700 dark:text-gray-200 rounded-xl text-xs font-medium transition-colors"
+                  >
+                    Raw JSON
+                  </button>
+                  <button
+                    onClick={handleDownload}
+                    title="Download File"
+                    className="p-2.5 bg-gray-100 dark:bg-[#333] hover:bg-gray-200 dark:hover:bg-[#444] text-gray-600 dark:text-gray-300 rounded-xl transition-colors"
+                  >
+                    <Download size={16} />
+                  </button>
+                </div>
+              </div>
+            )
           ) : ext === 'md' && markdownRenderMode === 'rendered' ? (
-            <MarkdownViewer
-              fileUrl={rawUrl}
-              fileName={item.name}
-              fileSize={item.size}
-              extension={ext}
-              onDownload={handleDownload}
-            />
+            isMarkdownLicensed ? (
+              <MarkdownViewer
+                fileUrl={rawUrl}
+                fileName={item.name}
+                fileSize={item.size}
+                extension={ext}
+                onDownload={handleDownload}
+              />
+            ) : (
+              <div className="w-full max-w-md p-6 bg-white dark:bg-[#252526] rounded-2xl shadow-xl border border-gray-200 dark:border-[#333333] flex flex-col items-center gap-4 text-center animate-in zoom-in-95">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-600 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-purple-500/30">
+                  <FileText size={28} />
+                </div>
+                <div>
+                  <div className="flex items-center justify-center gap-1.5 mb-1">
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800/80">
+                      KV File PRO Exclusive
+                    </span>
+                  </div>
+                  <h3 className="font-bold text-base text-gray-900 dark:text-gray-100">
+                    Markdown Studio & Mermaid Viewer
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                    Enhanced Markdown preview with KaTeX math equations, Mermaid diagrams, and formatted tables requires the Markdown Studio extension.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 w-full pt-1">
+                  <button
+                    onClick={() => {
+                      setQuickLookOpen(false);
+                      openSettings('extensions');
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-blue-600/20 transition-all active:scale-95 cursor-pointer"
+                  >
+                    <Crown size={15} className="text-amber-200" />
+                    <span>Unlock Extension (29.000 ₫)</span>
+                  </button>
+                  <button
+                    onClick={() => setMarkdownRenderMode('raw')}
+                    className="px-3 py-2.5 bg-gray-100 dark:bg-[#333] hover:bg-gray-200 dark:hover:bg-[#444] text-gray-700 dark:text-gray-200 rounded-xl text-xs font-medium transition-colors"
+                  >
+                    Raw Text
+                  </button>
+                  <button
+                    onClick={handleDownload}
+                    title="Download File"
+                    className="p-2.5 bg-gray-100 dark:bg-[#333] hover:bg-gray-200 dark:hover:bg-[#444] text-gray-600 dark:text-gray-300 rounded-xl transition-colors"
+                  >
+                    <Download size={16} />
+                  </button>
+                </div>
+              </div>
+            )
           ) : activeExtension && (ext !== 'md' || markdownRenderMode !== 'raw') ? (
             <ExtensionPreviewHost
               extension={activeExtension}
@@ -298,13 +396,42 @@ export const QuickLookModal: React.FC = () => {
                 </div>
               </div>
             ) : ['svg', 'svgz'].includes(ext) ? (
-              <VectorStudioViewer
-                fileUrl={rawUrl}
-                fileName={item.name}
-                fileSize={item.size}
-                extension={ext}
-                onDownload={handleDownload}
-              />
+              isVectorLicensed ? (
+                <VectorStudioViewer
+                  fileUrl={rawUrl}
+                  fileName={item.name}
+                  fileSize={item.size}
+                  extension={ext}
+                  onDownload={handleDownload}
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center p-4 relative">
+                  <img
+                    src={rawUrl}
+                    alt={item.name}
+                    className="max-w-full max-h-[82%] object-contain select-none rounded shadow-sm"
+                  />
+                  <div className="mt-3 flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        setQuickLookOpen(false);
+                        openSettings('extensions');
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-semibold shadow-sm transition-all cursor-pointer"
+                    >
+                      <Crown size={13} className="text-amber-200" />
+                      <span>Unlock Vector & SVG Studio Pro (39.000 ₫)</span>
+                    </button>
+                    <button
+                      onClick={handleDownload}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-200 dark:bg-[#333] hover:bg-gray-300 dark:hover:bg-[#444] text-gray-700 dark:text-gray-200 rounded-lg text-xs font-medium transition-colors"
+                    >
+                      <Download size={13} />
+                      <span>Download</span>
+                    </button>
+                  </div>
+                </div>
+              )
             ) : (
               <img
                 src={rawUrl}
@@ -617,14 +744,47 @@ export const QuickLookModal: React.FC = () => {
               </div>
             </div>
           ) : isTextOrCode && textContent !== null ? (
-            /* Enhanced Code & Config Studio Viewer */
-            <CodeConfigViewer
-              content={textContent}
-              fileName={item.name}
-              fileSize={item.size}
-              extension={ext}
-              onDownload={handleDownload}
-            />
+            /* Enhanced Code & Config Studio Viewer (Paid) vs Standard Text Preview */
+            isCodeLicensed ? (
+              <CodeConfigViewer
+                content={textContent}
+                fileName={item.name}
+                fileSize={item.size}
+                extension={ext}
+                onDownload={handleDownload}
+              />
+            ) : (
+              <div className="w-full h-full flex flex-col bg-white dark:bg-[#1e1e1e] rounded-lg border border-gray-200 dark:border-[#333333] overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-[#333333] bg-gray-50 dark:bg-[#252526] text-xs">
+                  <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                    <span className="font-mono font-medium">{item.name}</span>
+                    <span className="text-[10px] text-gray-400 font-mono">({formatHumanSize(item.size)})</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        setQuickLookOpen(false);
+                        openSettings('extensions');
+                      }}
+                      className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-semibold shadow-2xs transition-all cursor-pointer"
+                    >
+                      <Crown size={12} className="text-amber-200" />
+                      <span>Unlock Code & Config Studio Pro (39.000 ₫)</span>
+                    </button>
+                    <button
+                      onClick={handleDownload}
+                      className="flex items-center gap-1 px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs transition-colors"
+                    >
+                      <Download size={12} />
+                      <span>Download</span>
+                    </button>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-auto p-4 bg-gray-50 dark:bg-[#181818] font-mono text-xs select-text">
+                  <pre className="whitespace-pre text-gray-800 dark:text-gray-200">{textContent}</pre>
+                </div>
+              </div>
+            )
           ) : availableExtension ? (
             <div className="w-full max-w-md p-6 bg-white dark:bg-[#252526] rounded-2xl shadow-xl border border-gray-200 dark:border-[#333333] flex flex-col items-center gap-4 text-center animate-in zoom-in-95">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
@@ -669,7 +829,7 @@ export const QuickLookModal: React.FC = () => {
                     className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-md shadow-blue-600/20 transition-all active:scale-95 cursor-pointer"
                   >
                     <Crown size={15} className="text-amber-200" />
-                    <span>Unlock with KV File PRO (199.000 ₫)</span>
+                    <span>Unlock in Extension Store ({new Intl.NumberFormat('vi-VN').format(availableExtension.price || 199000)} ₫)</span>
                   </button>
                 ) : (
                   <button

@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { useExtensionStore } from '../../../stores/useExtensionStore';
 import { useAuthStore } from '../../../stores/useAuthStore';
-import { ExtensionCategory } from '../../../types';
+import { ExtensionCategory, ExtensionManifest } from '../../../types';
 import { ZaloPayPaymentModal } from './ZaloPayPaymentModal';
 import { AdminOrdersModal } from './AdminOrdersModal';
 
@@ -171,6 +171,7 @@ export const ExtensionsTab: React.FC = () => {
   const [showRedeemModal, setShowRedeemModal] = useState(false);
   const [showProModal, setShowProModal] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
+  const [selectedExtensionForPayment, setSelectedExtensionForPayment] = useState<ExtensionManifest | null>(null);
   const [copiedKey, setCopiedKey] = useState(false);
 
   useEffect(() => {
@@ -440,7 +441,7 @@ export const ExtensionsTab: React.FC = () => {
             const isInstalled = !!ext.installed;
             const isEnabled = !!ext.enabled;
             const isPaid = !!ext.isPaid;
-            const isPurchased = !isPaid || !!ext.isPurchased;
+            const isPurchased = isProLicensed || !isPaid || !!ext.isPurchased;
 
             return (
               <div
@@ -498,7 +499,15 @@ export const ExtensionsTab: React.FC = () => {
 
                     {/* Right side actions */}
                     <div className="flex items-center gap-1 shrink-0">
-                      {isPaid && !isPurchased ? null : isInstalled ? (
+                      {isPaid && !isPurchased ? (
+                        <button
+                          onClick={() => setSelectedExtensionForPayment(ext)}
+                          className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[11px] font-semibold shadow-2xs transition-all active:scale-95 flex items-center gap-1 cursor-pointer"
+                        >
+                          <Crown size={11} className="text-amber-200" />
+                          <span>Unlock • {new Intl.NumberFormat('vi-VN').format(ext.price || 0)} ₫</span>
+                        </button>
+                      ) : isInstalled ? (
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => toggleExtension(ext.id)}
@@ -586,6 +595,19 @@ export const ExtensionsTab: React.FC = () => {
           isProBundle={true}
           onClose={() => setShowProModal(false)}
           onSuccess={() => fetchLicenses()}
+        />
+      )}
+
+      {/* Individual Extension ZaloPay Payment Modal */}
+      {selectedExtensionForPayment && (
+        <ZaloPayPaymentModal
+          extension={selectedExtensionForPayment}
+          isProBundle={false}
+          onClose={() => setSelectedExtensionForPayment(null)}
+          onSuccess={() => {
+            setSelectedExtensionForPayment(null);
+            fetchLicenses();
+          }}
         />
       )}
 
